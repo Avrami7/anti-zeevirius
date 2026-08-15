@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ANTI-ZEEVIRIUS — Poste de commandement</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<!--
+  Jeton de session : le backend DOIT remplacer __AZ_TOKEN__ ci-dessous par le
+  jeton généré au démarrage (secrets.token_urlsafe(32)) avant de servir la page.
+  Formes acceptées par app.js, dans l'ordre :
+    1. <meta name="az-token" content="...">
+    2. window.AZ_TOKEN = "..."   (balise <script> injectée)
+    3. <body data-az-token="...">
+  Si aucun jeton n'est trouvé, l'interface le signale et reste navigable.
+-->
+<meta name="az-token" content="__AZ_TOKEN__">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<!-- Fond spatial anime : trou noir, aurore, planetes, asteroides, etoiles filantes -->
+<canvas id="spaceCanvas" aria-hidden="true"></canvas>
+
+<!-- ══ Atelier graphique : dégradés, filtres et pictogrammes, définis une fois ══ -->
+<svg class="sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bhHalo" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#ffb257" stop-opacity=".50"/>
+      <stop offset="38%"  stop-color="#ff7a17" stop-opacity=".22"/>
+      <stop offset="72%"  stop-color="#e04a05" stop-opacity=".07"/>
+      <stop offset="100%" stop-color="#e04a05" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Décalage Doppler : le côté qui vient vers nous est blanc-chaud -->
+    <linearGradient id="bhDisk" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#c2410c"/>
+      <stop offset="14%"  stop-color="#f2811b"/>
+      <stop offset="34%"  stop-color="#ffc063"/>
+      <stop offset="50%"  stop-color="#fff6dd"/>
+      <stop offset="66%"  stop-color="#ffce7a"/>
+      <stop offset="86%"  stop-color="#f5871c"/>
+      <stop offset="100%" stop-color="#b8380a"/>
+    </linearGradient>
+    <linearGradient id="bhArc" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#b8380a" stop-opacity=".55"/>
+      <stop offset="22%"  stop-color="#f08a1e" stop-opacity=".85"/>
+      <stop offset="50%"  stop-color="#ffe6b4" stop-opacity=".95"/>
+      <stop offset="78%"  stop-color="#f5921f" stop-opacity=".85"/>
+      <stop offset="100%" stop-color="#b8380a" stop-opacity=".55"/>
+    </linearGradient>
+    <linearGradient id="bhHot" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#ffd9a0" stop-opacity="0"/>
+      <stop offset="45%"  stop-color="#fffaf0" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#ffd9a0" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="bhCore" cx="50%" cy="46%" r="60%">
+      <stop offset="0%"   stop-color="#000000"/>
+      <stop offset="82%"  stop-color="#000000"/>
+      <stop offset="100%" stop-color="#0b0603"/>
+    </radialGradient>
+    <linearGradient id="gScore" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#e2560f"/>
+      <stop offset="55%"  stop-color="#ff9f36"/>
+      <stop offset="100%" stop-color="#fff0cd"/>
+    </linearGradient>
+    <filter id="bhSoft" x="-45%" y="-160%" width="190%" height="420%">
+      <feGaussianBlur stdDeviation="2.2"/>
+    </filter>
+    <filter id="bhWide" x="-60%" y="-200%" width="220%" height="500%">
+      <feGaussianBlur stdDeviation="5.5"/>
+    </filter>
+  </defs>
+
+  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M12 20a8 8 0 1 1 8-8"/><path d="M12 12l4.5-3.2"/><circle cx="12" cy="12" r="1.4"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5.4c0 4.3-2.9 8.2-7 9.6-4.1-1.4-7-5.3-7-9.6V6z"/><path d="M9.2 12.2l2 2 3.6-3.9"/></symbol>
+  <symbol id="i-broom" viewBox="0 0 24 24"><path d="M14.5 4.5l5 5"/><path d="M13 6l5 5-6.2 6.2a4 4 0 0 1-2.2 1.1l-4.9.8.8-4.9a4 4 0 0 1 1.1-2.2z"/><path d="M6.5 14.5l3 3"/></symbol>
+  <symbol id="i-tree" viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="5" rx="1.4"/><rect x="14" y="15" width="7" height="5" rx="1.4"/><rect x="3" y="15" width="7" height="5" rx="1.4"/><path d="M10 6.5h4.5v11"/><path d="M14.5 17.5H10"/></symbol>
+  <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.4"/><rect x="10" y="10" width="4" height="4" rx="1"/><path d="M10 3v3M14 3v3M10 18v3M14 18v3M3 10h3M3 14h3M18 10h3M18 14h3"/></symbol>
+  <symbol id="i-radar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6-4.2"/><circle cx="12" cy="12" r="1.2"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M13 3H7.5A1.5 1.5 0 0 0 6 4.5v15A1.5 1.5 0 0 0 7.5 21h9a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M13 3v5h5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.8 12 5.8 21.5 12 21.5 12 18 18.2 12 18.2 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8.2 10.5V7.8a3.8 3.8 0 0 1 7.6 0v2.7"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 6.5h15"/><path d="M9.5 6.5V4.8h5v1.7"/><path d="M6.4 6.5l.9 12.1A1.6 1.6 0 0 0 8.9 20h6.2a1.6 1.6 0 0 0 1.6-1.4l.9-12.1"/><path d="M10.5 10v6M13.5 10v6"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4.4l8.4 14.6H3.6z"/><path d="M12 10v4.2M12 16.8v.1"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.6l4.4 4.4L19 7.4"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10.2 13.8a3.6 3.6 0 0 0 5.1 0l2.9-2.9a3.6 3.6 0 0 0-5.1-5.1l-1.3 1.3"/><path d="M13.8 10.2a3.6 3.6 0 0 0-5.1 0l-2.9 2.9a3.6 3.6 0 0 0 5.1 5.1l1.3-1.3"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6.4" height="6.4" rx="1.4"/><rect x="13.6" y="4" width="6.4" height="6.4" rx="1.4"/><rect x="4" y="13.6" width="6.4" height="6.4" rx="1.4"/><rect x="13.6" y="13.6" width="6.4" height="6.4" rx="1.4"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M4.5 9.5h9a5.5 5.5 0 0 1 0 11H9"/><path d="M8 5.5l-3.5 4L8 13.5"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.4V12l3.2 2"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 4v7.5"/><path d="M17.2 6.6a7.5 7.5 0 1 1-10.4 0"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M4 8.2l8-4 8 4v7.6l-8 4-8-4z"/><path d="M4 8.2l8 4 8-4M12 12.2V20"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7.5 18.5a4 4 0 0 1-.4-8 5.4 5.4 0 0 1 10.4 1.2 3.4 3.4 0 0 1-.6 6.8z"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h13M13 6.6l5.4 5.4-5.4 5.4"/></symbol>
+
+  <!-- ══ La marque : trou noir et son disque d'accrétion ══ -->
+  <symbol id="blackhole" viewBox="0 0 240 240">
+    <g class="bh-halo"><circle cx="120" cy="120" r="118" fill="url(#bhHalo)"/></g>
+    <g class="bh-stars">
+      <circle cx="34" cy="42" r="1.1"/><circle cx="206" cy="58" r="1.4"/><circle cx="196" cy="188" r="1"/>
+      <circle cx="48" cy="196" r="1.3"/><circle cx="118" cy="24" r="1"/><circle cx="22" cy="128" r="1"/>
+      <circle cx="222" cy="132" r="1.2"/><circle cx="150" cy="214" r="1"/>
+    </g>
+    <!-- disque arrière courbé au-dessus de l'horizon (lentille gravitationnelle) -->
+    <path class="bh-bloom" d="M14 124 A 106 66 0 0 1 226 124" fill="none" stroke="url(#bhArc)" stroke-width="15" stroke-linecap="round" filter="url(#bhWide)" opacity=".55"/>
+    <path class="bh-back"  d="M14 124 A 106 66 0 0 1 226 124" fill="none" stroke="url(#bhArc)" stroke-width="7.5" stroke-linecap="round" filter="url(#bhSoft)"/>
+    <path class="bh-backl" d="M14 124 A 106 66 0 0 1 226 124" fill="none" stroke="#fff3d6" stroke-width="2" stroke-linecap="round" opacity=".55"/>
+    <path class="bh-orbit-b" d="M14 124 A 106 66 0 0 1 226 124" fill="none" stroke="url(#bhHot)" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="26 300" opacity=".9"/>
+    <!-- moitié arrière du disque équatorial, occultée par l'horizon -->
+    <ellipse class="bh-ring" cx="120" cy="124" rx="106" ry="21" fill="none" stroke="url(#bhDisk)" stroke-width="13"/>
+    <!-- horizon des événements -->
+    <circle class="bh-shadow" cx="120" cy="120" r="46" fill="url(#bhCore)"/>
+    <circle class="bh-photon" cx="120" cy="120" r="46.8" fill="none" stroke="#ffdca6" stroke-width="1.6" opacity=".45"/>
+    <!-- moitié avant du disque, elle passe devant l'horizon -->
+    <path class="bh-bloomf" d="M14 124 A 106 21 0 0 0 226 124" fill="none" stroke="url(#bhDisk)" stroke-width="24" stroke-linecap="round" filter="url(#bhWide)" opacity=".5"/>
+    <path class="bh-front"  d="M14 124 A 106 21 0 0 0 226 124" fill="none" stroke="url(#bhDisk)" stroke-width="13" stroke-linecap="round"/>
+    <path class="bh-frontl" d="M14 124 A 106 21 0 0 0 226 124" fill="none" stroke="#fff8e6" stroke-width="2.6" stroke-linecap="round" opacity=".5"/>
+    <path class="bh-orbit-f" d="M14 124 A 106 21 0 0 0 226 124" fill="none" stroke="url(#bhHot)" stroke-width="5" stroke-linecap="round" stroke-dasharray="30 320" opacity=".95"/>
+  </symbol>
+</svg>
+
+<div class="halo" aria-hidden="true"><i class="halo-a"></i><i class="halo-b"></i><i class="halo-c"></i></div>
+<div class="starfield" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark bh bh-xs" aria-hidden="true"><svg viewBox="0 0 240 240"><use href="#blackhole"/></svg></span>
+    <span class="brand-txt">
+      <b>ANTI<i>·</i>ZEEVIRIUS</b>
+      <small>Poste de commandement</small>
+    </span>
+  </div>
+
+  <div class="topbar-live" id="topLive">
+    <span class="tchip" id="chipPlatform" title="Plateforme détectée"><span class="dot"></span><span class="tchip-l">Plateforme</span><span class="tchip-v" data-f="platform">—</span></span>
+    <span class="tchip" id="chipAdmin" title="Privilèges du processus"><span class="dot"></span><span class="tchip-l">Droits</span><span class="tchip-v" data-f="admin">—</span></span>
+    <span class="tchip" id="chipRealtime" title="Protection en temps réel"><span class="dot"></span><span class="tchip-l">Temps réel</span><span class="tchip-v" data-f="realtime">—</span></span>
+    <span class="tchip" id="chipShield" title="Bouclier anti-rançongiciel"><span class="dot"></span><span class="tchip-l">Bouclier</span><span class="tchip-v" data-f="shield">—</span></span>
+  </div>
+
+  <div class="topbar-end">
+    <span class="clock" id="clock" aria-label="Heure locale">--:--:--</span>
+    <button class="icon-btn" id="btnRefresh" type="button" title="Rafraîchir l'état" aria-label="Rafraîchir l'état">
+      <svg viewBox="0 0 24 24" class="ic"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4.2v4.2h-4.2"/></svg>
+    </button>
+    <button class="icon-btn nav-toggle" id="btnNav" type="button" aria-label="Afficher les sections" aria-expanded="false">
+      <svg viewBox="0 0 24 24" class="ic"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+  </div>
+</header>
+
+<nav class="rail" id="rail" aria-label="Sections">
+  <div class="rail-grp">
+    <p class="rail-lbl">Supervision</p>
+    <a class="rail-i" href="#/tableau-de-bord" data-view="tableau-de-bord"><svg class="ic"><use href="#i-gauge"/></svg><span>Tableau de bord</span></a>
+  </div>
+  <div class="rail-grp">
+    <p class="rail-lbl">Opérations</p>
+    <a class="rail-i" href="#/protection" data-view="protection"><svg class="ic"><use href="#i-shield"/></svg><span>Protection</span><em class="rail-n">7</em></a>
+    <a class="rail-i" href="#/nettoyage" data-view="nettoyage"><svg class="ic"><use href="#i-broom"/></svg><span>Nettoyage</span><em class="rail-n">4</em></a>
+    <a class="rail-i" href="#/rangement" data-view="rangement"><svg class="ic"><use href="#i-tree"/></svg><span>Rangement</span><em class="rail-n">6</em></a>
+    <a class="rail-i" href="#/systeme" data-view="systeme"><svg class="ic"><use href="#i-cpu"/></svg><span>Système</span><em class="rail-n">4</em></a>
+  </div>
+  <div class="rail-foot">
+    <div class="rail-sess">
+      <span class="sess-dot" id="sessDot"></span>
+      <span class="sess-txt"><b id="sessState">Liaison…</b><small id="sessSub">127.0.0.1</small></span>
+    </div>
+  </div>
+</nav>
+
+<main class="stage" id="stage">
+
+  <!-- ═══════════════ TABLEAU DE BORD ═══════════════ -->
+  <section class="view" id="view-tableau-de-bord" data-view="tableau-de-bord">
+    <div class="view-head">
+      <h1>Tableau de bord</h1>
+      <p>Synthèse de l'état de la machine et des modules de défense.</p>
+    </div>
+
+    <div class="deck deck-dash">
+      <article class="panel panel-hero span-2" id="heroPanel">
+        <div class="hero-grid">
+          <div class="hero-vis">
+            <span class="bh bh-lg" id="heroBh" aria-hidden="true"><svg viewBox="0 0 240 240"><use href="#blackhole"/></svg></span>
+            <svg class="score" viewBox="0 0 260 260" aria-hidden="true">
+              <circle class="score-bg" cx="130" cy="130" r="122"/>
+              <circle class="score-fg" id="scoreRing" cx="130" cy="130" r="122"/>
+            </svg>
+            <div class="hero-vis-c"><b class="num" id="scoreVal">—</b></div>
+            <p class="hero-vis-l">indice de protection</p>
+          </div>
+          <div class="hero-body">
+            <p class="hero-kicker">État global</p>
+            <h2 class="hero-title" id="postureTitle">Évaluation en cours</h2>
+            <p class="hero-sub" id="postureSub">Interrogation des modules de défense…</p>
+            <div class="hero-tags" id="postureTags"></div>
+            <div class="hero-cta">
+              <button class="btn btn-primary" type="button" data-goto="#/protection" data-focus="pScanDir">
+                <svg class="ic"><use href="#i-radar"/></svg> Lancer une analyse
+              </button>
+              <button class="btn btn-ghost" type="button" data-goto="#/nettoyage" data-focus="pClean">
+                <svg class="ic"><use href="#i-broom"/></svg> Nettoyage complet
+              </button>
+              <button class="btn btn-ghost" type="button" data-goto="#/systeme" data-focus="pGuardian">
+                <svg class="ic"><use href="#i-power"/></svg> Mode gardien
+              </button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel panel-stats" id="sigPanel">
+        <header class="p-head"><h3>Base de signatures</h3></header>
+        <div class="stat-row">
+          <div class="stat"><b class="num" data-f="hashes">—</b><span>empreintes</span></div>
+          <div class="stat"><b class="num" data-f="yara">—</b><span>règles YARA</span></div>
+        </div>
+        <p class="stat-note">Dernière mise à jour <span data-f="sigdate">—</span></p>
+      </article>
+
+      <article class="panel panel-stats" id="sasPanel">
+        <header class="p-head"><h3>Sas de sécurité</h3></header>
+        <div class="stat-row">
+          <div class="stat"><b class="num" data-f="quarantine">—</b><span>en quarantaine</span></div>
+          <div class="stat"><b class="num" data-f="staging">—</b><span>mis de côté</span></div>
+        </div>
+        <p class="stat-note">Rien n'est supprimé sans validation explicite.</p>
+      </article>
+
+      <article class="panel span-2" id="modPanel">
+        <header class="p-head">
+          <h3>Modules</h3>
+          <span class="p-hint">Disponibilité sur cette plateforme</span>
+        </header>
+        <ul class="modlist" id="modList"><li class="empty">Chargement…</li></ul>
+      </article>
+
+      <article class="panel panel-log">
+        <header class="p-head">
+          <h3>Journal de session</h3>
+          <button class="linkbtn" type="button" id="btnClearLog">Vider</button>
+        </header>
+        <ol class="log" id="log"></ol>
+      </article>
+    </div>
+  </section>
+
+  <!-- ═══════════════ PROTECTION ═══════════════ -->
+  <section class="view" id="view-protection" data-view="protection" hidden>
+    <div class="view-head">
+      <h1>Protection</h1>
+      <p>Analyse à la demande, surveillance continue, quarantaine et défenses avancées.</p>
+    </div>
+
+    <div class="deck">
+      <article class="panel span-2 panel-scan" id="pScanDir" data-mod="scanner">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-radar"/></svg> Analyse d'un dossier</h3>
+          <span class="p-hint">Récursive, avec mise en quarantaine automatique</span>
+        </header>
+        <div class="p-body">
+          <div class="field">
+            <label class="lbl" for="scanDirPath">Dossier à analyser</label>
+            <div class="field-row">
+              <input class="inp" id="scanDirPath" type="text" placeholder="C:\Users\Public\Downloads" spellcheck="false" autocomplete="off">
+              <button class="btn btn-primary" type="button" id="btnScanDir">Analyser</button>
+            </div>
+          </div>
+
+          <div class="scanhud" id="scanHud" data-state="idle">
+            <div class="scanhud-vis">
+              <span class="bh bh-md" id="scanBh" aria-hidden="true"><svg viewBox="0 0 240 240"><use href="#blackhole"/></svg></span>
+              <svg class="score score-scan" viewBox="0 0 260 260" aria-hidden="true">
+                <circle class="score-bg" cx="130" cy="130" r="122"/>
+                <circle class="score-fg" id="scanRing" cx="130" cy="130" r="122"/>
+              </svg>
+              <span class="infall" id="infall" aria-hidden="true"></span>
+            </div>
+            <div class="scanhud-data">
+              <div class="scanhud-top">
+                <span class="chip" id="scanState">En attente</span>
+                <span class="scan-pct num" id="scanPct">0 %</span>
+              </div>
+              <div class="bar"><i id="scanBar" style="width:0%"></i></div>
+              <p class="scan-current" id="scanCurrent">Aucune analyse en cours</p>
+              <div class="mini-stats">
+                <div class="ms"><b class="num" id="scanDone">0</b><span>analysés</span></div>
+                <div class="ms"><b class="num" id="scanTotal">0</b><span>à traiter</span></div>
+                <div class="ms ms-alert"><b class="num" id="scanThreats">0</b><span>menaces</span></div>
+              </div>
+              <div class="scanhud-act">
+                <button class="btn btn-ghost btn-sm" type="button" id="btnScanCancel" disabled>Interrompre</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="result" id="scanDirResult" hidden></div>
+        </div>
+      </article>
+
+      <article class="panel" id="pScanFile" data-mod="scanner">
+        <header class="p-head"><h3><svg class="ic"><use href="#i-file"/></svg> Analyse d'un fichier</h3></header>
+        <div class="p-body">
+          <div class="field">
+            <label class="lbl" for="scanFilePath">Chemin du fichier</label>
+            <div class="field-row">
+              <input class="inp" id="scanFilePath" type="text" placeholder="C:\Users\...\document.exe" spellcheck="false" autocomplete="off">
+              <button class="btn btn-primary" type="button" id="btnScanFile">Analyser</button>
+            </div>
+          </div>
+          <p class="p-note">Empreinte, règles YARA et heuristique en un seul passage.</p>
+          <div class="result" id="scanFileResult" hidden></div>
+        </div>
+      </article>
+
+      <article class="panel" id="pRealtime" data-mod="realtime">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-eye"/></svg> Protection en temps réel</h3>
+          <span class="statelamp" id="rtLamp" data-on="false"></span>
+        </header>
+        <div class="p-body">
+          <div class="field">
+            <label class="lbl" for="rtFolders">Dossiers surveillés</label>
+            <input class="inp" id="rtFolders" type="text" placeholder="C:\Users\Public\Downloads, C:\Users\Public\Desktop" spellcheck="false" autocomplete="off">
+            <p class="p-note">Séparez les chemins par une virgule.</p>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" type="button" id="btnRtStart">Démarrer</button>
+            <button class="btn btn-ghost" type="button" id="btnRtStop">Arrêter</button>
+          </div>
+          <div class="result" id="rtResult" hidden></div>
+        </div>
+      </article>
+
+      <article class="panel span-2" id="pQuarantine" data-mod="quarantine">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-lock"/></svg> Quarantaine</h3>
+          <button class="linkbtn" type="button" id="btnQList">Actualiser</button>
+        </header>
+        <div class="p-body">
+          <div class="tbl" id="qTable"><p class="empty">Aucun élément chargé.</p></div>
+        </div>
+      </article>
+
+      <article class="panel" id="pShield" data-mod="shield">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-shield"/></svg> Bouclier anti-rançongiciel</h3>
+          <span class="statelamp" id="shLamp" data-on="false"></span>
+        </header>
+        <div class="p-body">
+          <div class="field">
+            <label class="lbl" for="shFolders">Dossiers à protéger par leurres</label>
+            <input class="inp" id="shFolders" type="text" placeholder="C:\Users\Public\Documents" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" type="button" id="btnShStart">Déployer</button>
+            <button class="btn btn-ghost" type="button" id="btnShStatus">Vérifier</button>
+            <button class="btn btn-ghost" type="button" id="btnShProc">Processus suspects</button>
+            <button class="btn btn-ghost" type="button" id="btnShStop">Retirer</button>
+          </div>
+          <div class="result" id="shResult" hidden></div>
+        </div>
+      </article>
+
+      <article class="panel" id="pReputation" data-mod="reputation">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-cloud"/></svg> Réputation cloud</h3>
+          <span class="badge" id="vtBadge">—</span>
+        </header>
+        <div class="p-body">
+          <div class="field">
+            <label class="lbl" for="repPath">Fichier à confronter à VirusTotal</label>
+            <div class="field-row">
+              <input class="inp" id="repPath" type="text" placeholder="C:\Users\...\installeur.exe" spellcheck="false" autocomplete="off">
+              <button class="btn btn-primary" type="button" id="btnRep">Vérifier</button>
+            </div>
+          </div>
+          <p class="p-note">Seule l'empreinte du fichier est transmise, jamais son contenu.</p>
+          <div class="result" id="repResult" hidden></div>
+        </div>
+      </article>
+
+      <article class="panel span-2" id="pPhishing" data-mod="phishing">
+        <header class="p-head"><h3><svg class="ic"><use href="#i-link"/></svg> Vérification de lien</h3></header>
+        <div class="p-body">
+          <div class="field">
+            <label class="lbl" for="phUrl">Adresse à examiner avant de cliquer</label>
+            <div class="field-row">
+              <input class="inp" id="phUrl" type="text" placeholder="exemple.com/connexion" spellcheck="false" autocomplete="off">
+              <button class="btn btn-primary" type="button" id="btnPh">Examiner</button>
+            </div>
+          </div>
+          <div class="result" id="phResult" hidden></div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ═══════════════ NETTOYAGE ═══════════════ -->
+  <section class="view" id="view-nettoyage" data-view="nettoyage" hidden>
+    <div class="view-head">
+      <h1>Nettoyage</h1>
+      <p>Fichiers temporaires, encombrement disque, résidus d'applications et bloatware.</p>
+    </div>
+
+    <div class="deck">
+      <article class="panel span-2" id="pClean" data-mod="temp_cleaner">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-broom"/></svg> Nettoyage complet</h3>
+          <span class="tag tag-danger">Destructif</span>
+        </header>
+        <div class="p-body">
+          <p class="p-note">Temp utilisateur, %temp%, caches navigateurs et corbeille. L'analyse à blanc est toujours exécutée d'abord : rien n'est supprimé avant votre validation.</p>
+          <label class="check"><input type="checkbox" id="cleanAdmin"><span></span>Inclure les emplacements nécessitant les droits administrateur</label>
+          <div class="btn-row">
+            <button class="btn btn-primary" type="button" id="btnClean">Calculer le plan de nettoyage</button>
+          </div>
+          <div class="result" id="cleanResult" hidden></div>
+        </div>
+      </article>
+
+      <article class="panel span-2" id="pDisk" data-mod="disk_analyzer">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-box"/></svg> Analyse du disque</h3>
+          <span class="p-hint">Gros fichiers et doublons</span>
+        </header>
+        <div class="p-body">
+          <div class="field">
+            <label class="lbl" for="diskPath">Racine à analyser</label>
+            <div class="field-row">
+              <input class="inp" id="diskPath" type="text" placeholder="C:\" spellcheck="false" autocomplete="off">
+              <button class="btn btn-primary" type="button" id="btnDisk">Analyser</button>
+            </div>
+          </div>
+          <div class="jobline" id="diskJob" hidden>
+            <span class="bh bh-xs jobbh"><svg viewBox="0 0 240 240"><use href="#blackhole"/></svg></span>
+            <div class="jobline-main">
+              <div class="bar"><i id="diskBar" style="width:0%"></i></div>
+              <p class="jobline-txt"><span id="diskCurrent">—</span><b class="num" id="diskPct">0 %</b></p>
+            </div>
+          </div>
+          <div class="result" id="diskResult" hidden></div>
+        </div>
+      </article>
+
+      <article class="panel span-2" id="pApps" data-mod="app_manager">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-grid"/></svg> Applications installées</h3>
+          <div class="p-tools">
+            <label class="lbl-inline" for="appsSort">Tri</label>
+            <select class="sel" id="appsSort">
+              <option value="size">Taille</option>
+              <option value="name">Nom</option>
+              <option value="bloatware">Bloatware d'abord</option>
+            </select>
+            <button class="btn btn-ghost btn-sm" type="button" id="btnApps">Lister</button>
+            <button class="btn btn-danger btn-sm" type="button" id="btnDebloat">Retirer le bloatware</button>
+          </div>
+        </header>
+        <div class="p-body">
+          <div class="jobline" id="appsJob" hidden>
+            <span class="bh bh-xs jobbh"><svg viewBox="0 0 240 240"><use href="#blackhole"/></svg></span>
+            <div class="jobline-main">
+              <div class="bar"><i id="appsBar" style="width:0%"></i></div>
+              <p class="jobline-txt"><span id="appsCurrent">—</span><b class="num" id="appsPct">0 %</b></p>
+            </div>
+          </div>
+          <div class="tbl" id="appsTable"><p class="empty">Aucune application chargée.</p></div>
+        </div>
+      </article>
+
+      <article class="panel span-2" id="pResidue" data-mod="residue_cleaner">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-trash"/></svg> Résidus d'applications désinstallées</h3>
+        </header>
+        <div class="p-body">
+          <div class="seg" role="tablist" aria-label="Type de résidu">
+            <button class="seg-i is-on" type="button" role="tab" aria-selected="true" data-residue="shortcuts">Raccourcis orphelins</button>
+            <button class="seg-i" type="button" role="tab" aria-selected="false" data-residue="registry">Entrées de registre</button>
+            <button class="seg-i" type="button" role="tab" aria-selected="false" data-residue="folders">Dossiers orphelins</button>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-ghost" type="button" id="btnResidueScan">Rechercher</button>
+            <button class="btn btn-danger" type="button" id="btnResidueClean" disabled>Nettoyer la sélection</button>
+          </div>
+          <div class="tbl" id="residueTable"><p class="empty">Lancez une recherche pour afficher les résidus.</p></div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ═══════════════ RANGEMENT ═══════════════ -->
+  <section class="view" id="view-rangement" data-view="rangement" hidden>
+    <div class="view-head">
+      <h1>Rangement</h1>
+      <p>Tri assisté, réorganisation par critère, mise de côté réversible et annulation.</p>
+    </div>
+
+    <div class="deck">
+      <article class="panel span-2" id="pTriage" data-mod="file_triage">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-tree"/></svg> Tri d'un dossier</h3>
+          <span class="tag tag-soft">Réversible</span>
+        </header>
+        <div class="p-body">
+          <div class="field">
+            <label class="lbl" for="triagePath">Dossier à trier</label>
+            <div class="field-row">
+              <input class="inp" id="triagePath" type="text" placeholder="C:\Users\Public\Downloads" spellcheck="false" autocomplete="off">
+              <button class="btn btn-primary" type="button" id="btnTriage">Examiner</button>
+            </div>
+          </div>
+          <div class="jobline" id="triageJob" hidden>
+            <span class="bh bh-xs jobbh"><svg viewBox="0 0 240 240"><use href="#blackhole"/></svg></span>
+            <div class="jobline-main">
+              <div class="bar"><i id="triageBar" style="width:0%"></i></div>
+              <p class="jobline-txt"><span id="triageCurrent">—</span><b class="num" id="triagePct">0 %</b></p>
+            </div>
+          </div>
+          <div class="tbl" id="triageTable"><p class="empty">Aucun examen effectué.</p></div>
+          <div class="btn-row" id="triageActions" hidden>
+            <button class="btn btn-danger" type="button" id="btnTriageApply">Mettre de côté la sélection</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel span-2" id="pOrganize" data-mod="folder_organizer">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-grid"/></svg> Réorganisation d'un dossier</h3>
+          <span class="tag tag-soft">Réversible</span>
+        </header>
+        <div class="p-body">
+          <div class="field">
+            <label class="lbl" for="orgPath">Dossier à réorganiser</label>
+            <input class="inp" id="orgPath" type="text" placeholder="C:\Users\Public\Documents" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="seg" role="tablist" aria-label="Critère de réorganisation">
+            <button class="seg-i is-on" type="button" role="tab" aria-selected="true" data-orgmode="category">Par catégorie</button>
+            <button class="seg-i" type="button" role="tab" aria-selected="false" data-orgmode="application">Par application</button>
+            <button class="seg-i" type="button" role="tab" aria-selected="false" data-orgmode="importance">Par importance</button>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" type="button" id="btnOrgPlan">Prévisualiser le plan</button>
+            <button class="btn btn-danger" type="button" id="btnOrgApply" disabled>Appliquer</button>
+          </div>
+          <div class="result" id="orgResult" hidden></div>
+        </div>
+      </article>
+
+      <article class="panel" id="pMove" data-mod="folder_organizer">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-arrow"/></svg> Déplacer un dossier</h3>
+          <span class="tag tag-danger">Destructif</span>
+        </header>
+        <div class="p-body">
+          <div class="field">
+            <label class="lbl" for="movSrc">Dossier source</label>
+            <input class="inp" id="movSrc" type="text" placeholder="C:\Users\Public\Ancien" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="lbl" for="movDst">Dossier de destination</label>
+            <input class="inp" id="movDst" type="text" placeholder="C:\Users\Public\Archive" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="btn-row"><button class="btn btn-danger" type="button" id="btnMove">Préparer le déplacement</button></div>
+          <div class="result" id="movResult" hidden></div>
+        </div>
+      </article>
+
+      <article class="panel" id="pLeastUsed" data-mod="folder_organizer">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-clock"/></svg> Fichiers peu utilisés</h3>
+          <span class="tag tag-soft">Réversible</span>
+        </header>
+        <div class="p-body">
+          <div class="field">
+            <label class="lbl" for="luPath">Dossier</label>
+            <input class="inp" id="luPath" type="text" placeholder="C:\Users\Public\Documents" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="lbl" for="luDays">Inutilisés depuis (jours)</label>
+            <input class="inp inp-num" id="luDays" type="number" min="1" max="3650" value="180">
+          </div>
+          <div class="btn-row"><button class="btn btn-danger" type="button" id="btnLeastUsed">Préparer le rangement</button></div>
+          <div class="result" id="luResult" hidden></div>
+        </div>
+      </article>
+
+      <article class="panel span-2" id="pStaging" data-mod="file_triage">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-box"/></svg> Fichiers mis de côté</h3>
+          <div class="p-tools">
+            <button class="btn btn-ghost btn-sm" type="button" id="btnStagingList">Actualiser</button>
+            <label class="lbl-inline" for="purgeDays">Purger après</label>
+            <input class="inp inp-num inp-xs" id="purgeDays" type="number" min="1" max="365" value="30">
+            <button class="btn btn-danger btn-sm" type="button" id="btnStagingPurge">Purger</button>
+          </div>
+        </header>
+        <div class="p-body">
+          <div class="tbl" id="stagingTable"><p class="empty">Aucun élément chargé.</p></div>
+        </div>
+      </article>
+
+      <article class="panel span-2" id="pSessions" data-mod="folder_organizer">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-undo"/></svg> Annuler une réorganisation</h3>
+          <button class="linkbtn" type="button" id="btnSessions">Actualiser</button>
+        </header>
+        <div class="p-body">
+          <div class="tbl" id="sessionsTable"><p class="empty">Aucune session chargée.</p></div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ═══════════════ SYSTÈME ═══════════════ -->
+  <section class="view" id="view-systeme" data-view="systeme" hidden>
+    <div class="view-head">
+      <h1>Système</h1>
+      <p>Démarrage de Windows, tâches planifiées et passe complète du mode gardien.</p>
+    </div>
+
+    <div class="deck">
+      <article class="panel span-2" id="pStartup" data-mod="startup_manager">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-power"/></svg> Programmes au démarrage</h3>
+          <button class="linkbtn" type="button" id="btnStartup">Actualiser</button>
+        </header>
+        <div class="p-body">
+          <div class="tbl" id="startupTable"><p class="empty">Aucune entrée chargée.</p></div>
+        </div>
+      </article>
+
+      <article class="panel" id="pSchedule" data-mod="task_scheduler">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-clock"/></svg> Nettoyage hebdomadaire</h3>
+        </header>
+        <div class="p-body">
+          <div class="field-grid">
+            <div class="field">
+              <label class="lbl" for="schDay">Jour</label>
+              <select class="sel" id="schDay">
+                <option value="MON">Lundi</option><option value="TUE">Mardi</option>
+                <option value="WED">Mercredi</option><option value="THU">Jeudi</option>
+                <option value="FRI">Vendredi</option><option value="SAT">Samedi</option>
+                <option value="SUN" selected>Dimanche</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="lbl" for="schTime">Heure</label>
+              <input class="inp" id="schTime" type="time" value="20:00">
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" type="button" id="btnSchAdd">Planifier</button>
+            <button class="btn btn-ghost" type="button" id="btnSchDel">Supprimer la tâche</button>
+          </div>
+          <div class="result" id="schResult" hidden></div>
+        </div>
+      </article>
+
+      <article class="panel" id="pGuardianSched" data-mod="task_scheduler">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-clock"/></svg> Gardien quotidien</h3>
+        </header>
+        <div class="p-body">
+          <div class="field">
+            <label class="lbl" for="gsTime">Heure d'exécution</label>
+            <input class="inp" id="gsTime" type="time" value="12:00">
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" type="button" id="btnGsAdd">Activer</button>
+            <button class="btn btn-ghost" type="button" id="btnGsDel">Désactiver</button>
+          </div>
+          <div class="result" id="gsResult" hidden></div>
+        </div>
+      </article>
+
+      <article class="panel span-2 panel-guardian" id="pGuardian" data-mod="guardian">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-shield"/></svg> Mode gardien</h3>
+          <span class="tag tag-danger">Destructif — validation finale</span>
+        </header>
+        <div class="p-body">
+          <p class="p-note">Une passe complète : analyse, nettoyage, rangement. Les suppressions sont différées et attendent votre validation dans la file ci-dessous.</p>
+          <div class="field">
+            <label class="lbl" for="gdFolders">Dossiers concernés</label>
+            <input class="inp" id="gdFolders" type="text" placeholder="C:\Users\Public\Downloads, C:\Users\Public\Documents" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" type="button" id="btnGdRun">Lancer une passe</button>
+            <button class="btn btn-ghost" type="button" id="btnGdPending">Voir la file d'attente</button>
+          </div>
+          <div class="jobline" id="gdJob" hidden>
+            <span class="bh bh-xs jobbh"><svg viewBox="0 0 240 240"><use href="#blackhole"/></svg></span>
+            <div class="jobline-main">
+              <div class="bar"><i id="gdBar" style="width:0%"></i></div>
+              <p class="jobline-txt"><span id="gdCurrent">—</span><b class="num" id="gdPct">0 %</b></p>
+            </div>
+          </div>
+          <div class="tbl" id="gdTable"><p class="empty">Aucune file d'attente chargée.</p></div>
+          <div class="btn-row" id="gdConfirmRow" hidden>
+            <label class="lbl-inline" for="gdDays">Supprimer définitivement au-delà de</label>
+            <input class="inp inp-num inp-xs" id="gdDays" type="number" min="1" max="365" value="7">
+            <span class="lbl-inline">jours</span>
+            <button class="btn btn-danger" type="button" id="btnGdConfirm">Valider la suppression</button>
+          </div>
+          <div class="result" id="gdResult" hidden></div>
+        </div>
+      </article>
+    </div>
+  </section>
+</main>
+
+<!-- ═══════════════ CONFIRMATION DESTRUCTIVE ═══════════════ -->
+<div class="sheet-wrap" id="sheetWrap" hidden>
+  <div class="sheet-veil" id="sheetVeil"></div>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" id="sheet">
+    <header class="sheet-head">
+      <span class="sheet-sig" id="sheetSig"><svg class="ic"><use href="#i-alert"/></svg></span>
+      <div class="sheet-head-txt">
+        <p class="sheet-kicker" id="sheetKicker">Validation requise</p>
+        <h2 id="sheetTitle">Confirmer l'opération</h2>
+      </div>
+      <button class="icon-btn" type="button" id="sheetClose" aria-label="Annuler"><svg class="ic"><use href="#i-close"/></svg></button>
+    </header>
+
+    <div class="sheet-body">
+      <p class="sheet-lead" id="sheetLead"></p>
+      <div class="sheet-figs" id="sheetFigs"></div>
+      <div class="sheet-plan" id="sheetPlan"></div>
+      <p class="sheet-rev" id="sheetRev"></p>
+    </div>
+
+    <footer class="sheet-foot">
+      <label class="check check-strong"><input type="checkbox" id="sheetAck"><span></span><span id="sheetAckTxt">J'ai lu le plan ci-dessus et je valide cette opération.</span></label>
+      <div class="sheet-foot-row">
+        <p class="sheet-timer">Jeton valable encore <b class="num" id="sheetTimer">5:00</b></p>
+        <div class="sheet-btns">
+          <button class="btn btn-ghost" type="button" id="sheetCancel">Annuler</button>
+          <button class="btn btn-danger" type="button" id="sheetGo" disabled>Exécuter</button>
+        </div>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<div class="demo-flag" id="demoFlag" hidden><span class="df-dot"></span>Mode démonstration — données factices, aucun appel au backend</div>
+
+<script src="space.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

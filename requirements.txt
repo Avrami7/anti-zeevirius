@@ -1,0 +1,15 @@
+watchdog>=4.0.0
+yara-python>=4.5.0
+pefile>=2023.2.7
+psutil>=5.9.0
+requests>=2.31.0
+# Optionnel — vectorise le calcul d'entropie de Shannon (scanner/heuristics.py)
+# via np.bincount au lieu d'une boucle Python octet par octet : ~50-100x plus
+# rapide sur des sections PE de plusieurs Mo. Sans ce paquet, repli automatique
+# sur l'implémentation pure Python (résultat identique, juste plus lent).
+numpy>=1.26.0
+# Optionnel — améliore la précision de l'option 20 (fichiers les moins
+# utilisés) en croisant avec les Éléments récents Windows. Sans ce paquet,
+# l'outil fonctionne quand même (repli sur la date de modification, avec
+# avertissement explicite affiché à l'écran).
+pywin32>=306 ; sys_platform == "win32"

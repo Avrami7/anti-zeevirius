@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Données produites à l'exécution — jamais versionnées.
+# NB : le paquet source quarantine/ (quarantine_manager.py) DOIT l'être ;
+# le stockage réel des fichiers isolés est quarantine_storage/.
+logs/*.log
+quarantine_storage/
+triage_staging/
+organizer_logs/
+cache/
+signatures/vt_api_key.txt

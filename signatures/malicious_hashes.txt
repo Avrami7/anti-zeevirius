@@ -1,0 +1,11 @@
+# Base de hashes SHA-256 malveillants connus — un hash par ligne
+# Les lignes commençant par # sont ignorées.
+#
+# Cette base est VIDE par défaut (exemple pédagogique).
+# Pour un usage réel, alimentez-la avec des flux de threat intelligence :
+#   - MalwareBazaar (Abuse.ch) : https://bazaar.abuse.ch/export/
+#   - VirusShare (accès sur inscription) : https://virusshare.com/
+#   - Flux CSV VirusTotal (si vous avez un abonnement API)
+#
+# Exemple de format attendu (hash factice, ne pas utiliser tel quel) :
+# 3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1

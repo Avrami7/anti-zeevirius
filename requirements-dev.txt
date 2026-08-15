@@ -1,0 +1,6 @@
+# Dépendances de DÉVELOPPEMENT uniquement (tests) — ne pas installer sur une
+# machine de production, seulement pour contribuer/valider le projet :
+#   pip install -r requirements.txt -r requirements-dev.txt
+#   pytest tests/ -v
+-r requirements.txt
+pytest>=8.0.0

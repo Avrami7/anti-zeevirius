@@ -10,14 +10,25 @@ erreur.
 """
 
 import os
-import winreg
 from pathlib import Path
 from typing import Dict, List
 
-RUN_KEY_PATHS = [
-    (winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run"),
-    (winreg.HKEY_LOCAL_MACHINE, r"Software\Microsoft\Windows\CurrentVersion\Run"),
-]
+try:
+    import winreg
+    WINREG_AVAILABLE = True
+except ImportError:
+    WINREG_AVAILABLE = False
+
+# Les constantes HKEY_* n'existent que si winreg a pu être importé : hors
+# Windows la table reste vide et toutes les méthodes registre renvoient
+# une réponse d'indisponibilité (voir les gardes `if not WINREG_AVAILABLE`).
+if WINREG_AVAILABLE:
+    RUN_KEY_PATHS = [
+        (winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run"),
+        (winreg.HKEY_LOCAL_MACHINE, r"Software\Microsoft\Windows\CurrentVersion\Run"),
+    ]
+else:
+    RUN_KEY_PATHS = []
 
 BACKUP_KEY_PATH = r"Software\AntiZeevirius\DisabledStartupBackup"
 
@@ -34,6 +45,9 @@ class StartupManager:
 
     def list_registry_startup_items(self) -> List[Dict]:
         """Liste toutes les entrées des clés Run (HKCU + HKLM)."""
+        if not WINREG_AVAILABLE:
+            return []
+
         items = []
         for hive, key_path in RUN_KEY_PATHS:
             hive_name = "HKCU" if hive == winreg.HKEY_CURRENT_USER else "HKLM"
@@ -80,6 +94,9 @@ class StartupManager:
     def disable_registry_item(self, hive_name: str, key_path: str, name: str) -> bool:
         """Déplace une entrée de démarrage vers une clé de sauvegarde
         (réversible) au lieu de la supprimer définitivement."""
+        if not WINREG_AVAILABLE:
+            return False
+
         hive = winreg.HKEY_CURRENT_USER if hive_name == "HKCU" else winreg.HKEY_LOCAL_MACHINE
 
         try:
@@ -102,6 +119,9 @@ class StartupManager:
 
     def restore_registry_item(self, hive_name: str, name: str) -> bool:
         """Restaure une entrée précédemment désactivée."""
+        if not WINREG_AVAILABLE:
+            return False
+
         try:
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER, BACKUP_KEY_PATH, 0, winreg.KEY_READ) as backup_key:
                 value, _ = winreg.QueryValueEx(backup_key, f"{hive_name}|{name}")

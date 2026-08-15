@@ -89,6 +89,23 @@ class QuarantineManager:
         with self._lock:
             return [entry for entry in self._load_index() if not entry["restored"]]
 
+    @staticmethod
+    def _unique_destination(destination: Path) -> Path:
+        """Évite d'écraser un fichier existant : ajoute ' (2)', ' (3)'...
+
+        Même convention que FolderOrganizer._unique_destination(), pour que le
+        comportement en cas de collision soit identique dans tout le projet.
+        """
+        if not destination.exists():
+            return destination
+        stem, suffix, parent = destination.stem, destination.suffix, destination.parent
+        counter = 2
+        while True:
+            candidate = parent / f"{stem} ({counter}){suffix}"
+            if not candidate.exists():
+                return candidate
+            counter += 1
+
     def restore_file(self, quarantine_id: str) -> bool:
         """Restaure un fichier vers son emplacement d'origine (cas de faux positif)."""
         with self._lock:
@@ -99,7 +116,18 @@ class QuarantineManager:
                     original_path = Path(entry["original_path"])
                     try:
                         original_path.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.move(str(quarantined_path), str(original_path))
+                        # Un fichier a pu être recréé au chemin d'origine depuis la mise en
+                        # quarantaine. shutil.move() l'écraserait silencieusement : on restaure
+                        # alors à côté, sous un nom libre, plutôt que de détruire cette donnée.
+                        # Même convention de suffixe que FolderOrganizer._unique_destination().
+                        destination = self._unique_destination(original_path)
+                        shutil.move(str(quarantined_path), str(destination))
+                        if destination != original_path:
+                            entry["restored_to"] = str(destination)
+                            print(
+                                f"[INFO] Un fichier existait déjà en {original_path} — "
+                                f"restauration effectuée sous {destination.name}"
+                            )
                         entry["restored"] = True
                         entry["restore_date"] = datetime.now().isoformat()
                         self._save_index(index)

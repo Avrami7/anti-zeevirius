@@ -6,6 +6,7 @@ seul os.walk(topdown=False) au lieu de 2 parcours rglob() + un tri O(N log N).
 """
 
 import os
+import time
 from pathlib import Path
 
 import pytest
@@ -117,3 +118,42 @@ class TestMoveFolderIntoMergeCase:
         organizer.move_folder_into(str(source), str(target_parent))
 
         assert not (tmp_path / "source").exists() or not any((tmp_path / "source").rglob("*"))
+
+
+class TestLeastUsedExclusions:
+    """L'option 20 (« ranger les fichiers les moins utilisés ») recevait, contrairement
+    aux options 16-18, la liste des dossiers internes de l'outil — quarantaine, staging,
+    journaux. Pointée sur le dossier d'installation, elle pouvait donc ranger les
+    fichiers de travail de l'antivirus lui-même. Ces tests figent la correction."""
+
+    @staticmethod
+    def _make_old_file(path: Path, age_days: int = 400) -> Path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"x" * 64)
+        old = time.time() - age_days * 86400
+        os.utime(path, (old, old))
+        return path
+
+    def test_excluded_directory_is_not_proposed(self, organizer, tmp_path):
+        interne = self._make_old_file(tmp_path / "quarantine_storage" / "menace.bin")
+        normal = self._make_old_file(tmp_path / "vieux_document.bin")
+
+        result = organizer.find_least_used_files(
+            str(tmp_path), unused_since_days=180,
+            excluded_dirs=[(tmp_path / "quarantine_storage").resolve()],
+        )
+        proposes = {f["path"] for f in result["files"]}
+
+        assert str(normal) in proposes
+        assert str(interne) not in proposes, (
+            "un fichier situé dans un dossier interne de l'outil ne doit jamais être proposé"
+        )
+
+    def test_without_exclusions_nothing_changes(self, organizer, tmp_path):
+        """Non-régression : sans exclusion fournie, le comportement d'origine
+        est strictement préservé (le paramètre est optionnel)."""
+        a = self._make_old_file(tmp_path / "dossier" / "a.bin")
+
+        result = organizer.find_least_used_files(str(tmp_path), unused_since_days=180)
+
+        assert str(a) in {f["path"] for f in result["files"]}

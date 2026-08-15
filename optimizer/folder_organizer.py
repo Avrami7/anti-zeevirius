@@ -392,7 +392,8 @@ class FolderOrganizer:
         return (identical / len(sample_stats)) < 0.9  # <90% identiques → suivi probablement actif
 
     def find_least_used_files(
-        self, dir_path: str, unused_since_days: int = 180, top_n: int = 100
+        self, dir_path: str, unused_since_days: int = 180, top_n: int = 100,
+        excluded_dirs: Optional[List[Path]] = None,
     ) -> Dict:
         """Retourne les fichiers non utilisés depuis N jours.
         Combine 2 signaux : date de modification/accès (SOLUTION B : parcours
@@ -411,9 +412,15 @@ class FolderOrganizer:
         recent_index = self._get_recent_usage_index()
 
         now = time.time()
+        excluded_dirs = excluded_dirs or []
         candidates = []
         for f, st in _scan_files(root):
             if self._is_never_move(f):
+                continue
+            # Même exclusion que build_plan() : sans elle, pointer cette
+            # fonction sur le dossier d'installation rangeait les dossiers
+            # internes de l'outil (quarantaine, staging, journaux).
+            if any(f.resolve() == ex or ex in f.resolve().parents for ex in excluded_dirs):
                 continue
             last_used = max(st.st_atime, st.st_mtime) if atime_reliable else st.st_mtime
             if recent_index:
@@ -554,11 +561,14 @@ class FolderOrganizer:
     def organize_least_used(
         self, dir_path: str, unused_since_days: int = 180,
         destination_folder_name: str = "00_Non_utilises_depuis_longtemps",
+        excluded_dirs: Optional[List[Path]] = None,
     ) -> Dict:
         """Construit ET applique en une fois le rangement des fichiers les
         moins utilisés (le menu affiche toujours la liste avant confirmation —
         voir main.py)."""
-        result = self.find_least_used_files(dir_path, unused_since_days)
+        result = self.find_least_used_files(
+            dir_path, unused_since_days, excluded_dirs=excluded_dirs
+        )
         root = Path(dir_path)
         plan = []
         for f in result["files"]:

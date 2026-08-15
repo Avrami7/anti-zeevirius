@@ -685,7 +685,7 @@ def main() -> None:
                 print(f"  {count} élément(s) récent(s) indexé(s).")
 
             print("\nAnalyse en cours...")
-            result = engine.folder_organizer.find_least_used_files(path, unused_since_days=days)
+            result = engine.folder_organizer.find_least_used_files(path, unused_since_days=days, excluded_dirs=engine._excluded_dirs)
             print(f"\n{result['note']}\n")
             if not result["files"]:
                 print("Aucun fichier n'atteint ce seuil d'inutilisation.")
@@ -701,7 +701,7 @@ def main() -> None:
                 "\nLes ranger dans un sous-dossier '00_Non_utilises_depuis_longtemps' ? (oui/non) : "
             ).strip().lower()
             if confirm == "oui":
-                report = engine.folder_organizer.organize_least_used(path, unused_since_days=days)
+                report = engine.folder_organizer.organize_least_used(path, unused_since_days=days, excluded_dirs=engine._excluded_dirs)
                 print(f"\n{report['moved']} fichier(s) rangé(s).")
                 if report["errors"]:
                     print(f"{len(report['errors'])} erreur(s) :")

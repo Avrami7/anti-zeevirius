@@ -154,6 +154,14 @@ class FileTriage:
             for dup in include_duplicates:
                 # Garde toujours la 1ère copie, propose les suivantes en "caution"
                 for extra_path in dup["paths"][1:]:
+                    # Le garde-fou « jamais touché » s'applique AUSSI aux doublons : être en
+                    # double ne retire pas à une photo ou à un .docx son caractère personnel.
+                    # Sans ce filtre, ces fichiers étaient proposés à la suppression alors que
+                    # la boucle principale ci-dessus les en exclut — le fait de passer par
+                    # include_duplicates contournait entièrement NEVER_TOUCH_EXTENSIONS.
+                    if self._is_never_touch(Path(extra_path)):
+                        candidates["never_touch_count"] += 1
+                        continue
                     candidates["caution"].append({
                         "path": extra_path,
                         "category": "caution",
@@ -222,6 +230,22 @@ class FileTriage:
         with self._lock:
             return self._load_index()
 
+    @staticmethod
+    def _unique_destination(destination: Path) -> Path:
+        """Évite d'écraser un fichier existant : ajoute ' (2)', ' (3)'...
+
+        Même convention que FolderOrganizer._unique_destination().
+        """
+        if not destination.exists():
+            return destination
+        stem, suffix, parent = destination.stem, destination.suffix, destination.parent
+        counter = 2
+        while True:
+            candidate = parent / f"{stem} ({counter}){suffix}"
+            if not candidate.exists():
+                return candidate
+            counter += 1
+
     def restore_from_staging(self, staging_id: str) -> bool:
         with self._lock:
             index = self._load_index()
@@ -231,7 +255,16 @@ class FileTriage:
                     original = Path(entry["original_path"])
                     try:
                         original.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.move(str(staged_file), str(original))
+                        # Un fichier a pu être recréé au chemin d'origine depuis la mise de
+                        # côté. shutil.move() l'écraserait silencieusement : on restaure à
+                        # côté sous un nom libre plutôt que de détruire cette donnée.
+                        destination = self._unique_destination(original)
+                        shutil.move(str(staged_file), str(destination))
+                        if destination != original:
+                            print(
+                                f"[INFO] Un fichier existait déjà en {original} — "
+                                f"restauration effectuée sous {destination.name}"
+                            )
                         index.remove(entry)
                         self._save_index(index)
                         return True

@@ -63,6 +63,15 @@ MASS_MODIFICATION_WINDOW_SECONDS = 10
 # des faux positifs (utilisateur actif), soit une détection trop tardive
 # (machine quasi-inactive, où même 8 fichiers/10s est déjà anormal).
 #
+# PORTÉE RÉELLE DE CETTE COUCHE — à lire avant de s'y fier :
+# le seuil appliqué est max(plancher, μ + t·σ), donc TOUJOURS ≥ 15. Cette
+# couche corrige donc uniquement le premier cas (faux positifs sur machine
+# active, en relevant le seuil). Le second cas — détecter plus tôt sur une
+# machine calme — n'est PAS traité : le plancher de 15 l'interdit par
+# construction. Descendre sous ce plancher supposerait d'accepter davantage
+# de fausses alertes ; c'est un arbitrage de politique de détection, laissé
+# ouvert et non tranché ici.
+#
 # On calcule donc, à partir de l'activité RÉELLEMENT mesurée sur CETTE
 # machine, un seuil personnalisé garanti statistiquement via l'inégalité
 # de Cantelli (Chebyshev unilatérale) :
@@ -226,9 +235,14 @@ class RansomwareShield:
 
         Le seuil appliqué est max(plancher empirique fixe, seuil
         auto-calibré Welford+Cantelli) — voir adaptive_threshold().
-        Ceci ne peut jamais être MOINS sensible que l'ancienne version
-        à seuil fixe, seulement égal ou plus tôt/plus précis une fois
-        la baseline de la machine mesurée.
+
+        Sens exact de cette garantie : le max() ne peut que RELEVER le
+        seuil au-dessus du plancher de 15, jamais l'abaisser. La couche
+        adaptative réduit donc les fausses alertes sur une machine
+        active, au prix d'une alerte potentiellement plus tardive ; elle
+        ne rend jamais la détection plus précoce que le seuil fixe
+        d'origine. (Une version antérieure de cette docstring affirmait
+        l'inverse — c'était faux.)
         """
         now = time.time()
         self._modification_timestamps.append(now)

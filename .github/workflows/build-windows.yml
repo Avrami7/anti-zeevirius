@@ -1,0 +1,203 @@
+# ============================================================================
+#  Construction de l'installeur Windows d'ANTI-ZEEVIRIUS.
+#
+#  Deux déclencheurs :
+#    * manuel (« Run workflow ») — pour produire un installeur d'essai ;
+#    * tag v* (v1.2.0) — production : l'installeur est en plus attaché à la
+#      Release GitHub correspondante.
+#
+#  Enchaînement : tests → exécutable → installeur → artefacts. Les tests
+#  passent AVANT la construction, et un échec arrête tout : mieux vaut pas
+#  d'installeur du tout qu'un installeur d'antivirus dont la quarantaine est
+#  cassée. Un utilisateur ne peut pas savoir que le binaire qu'il télécharge
+#  vient d'une suite rouge ; nous, si.
+# ============================================================================
+
+name: Installeur Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Numéro de version à graver dans l'exécutable et l'installeur"
+        required: false
+        default: "1.0.0"
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write        # nécessaire pour créer/compléter la Release sur tag
+
+jobs:
+  build:
+    runs-on: windows-latest
+    # PyInstaller produit un exécutable POUR la plateforme sur laquelle il
+    # tourne : il n'existe pas de compilation croisée. Un .exe Windows exige
+    # donc une machine Windows, sans exception.
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Déterminer le numéro de version
+        id: version
+        shell: pwsh
+        run: |
+          # Sur tag : v1.2.0 → 1.2.0. Sinon : la saisie manuelle, ou 1.0.0.
+          if ($env:GITHUB_REF -like 'refs/tags/v*') {
+            $v = $env:GITHUB_REF_NAME -replace '^v', ''
+          } else {
+            $v = '${{ inputs.version }}'
+            if ([string]::IsNullOrWhiteSpace($v)) { $v = '1.0.0' }
+          }
+          "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Version retenue : $v"
+
+      - name: Installer les dépendances
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          # requirements-dev.txt tire déjà requirements.txt (et pytest).
+          pip install -r requirements-dev.txt
+          # Outillage de construction, absent des dépendances d'exécution :
+          # PyInstaller gèle l'application, Pillow régénère l'icône.
+          # Guillemets obligatoires : dans PowerShell, « > » non protégé est
+          # une redirection de flux, pas une contrainte de version — la
+          # commande créerait un fichier nommé « =6.0 » et installerait la
+          # dernière version de PyInstaller sans rien dire.
+          pip install "pyinstaller>=6.0" pillow
+
+      - name: Lancer la suite de tests
+        shell: pwsh
+        run: python -m pytest tests/ -q
+        # Aucun « continue-on-error » ici, volontairement : c'est la seule
+        # barrière entre une régression et un installeur signé de notre nom.
+
+      - name: Régénérer l'icône
+        shell: pwsh
+        run: |
+          # L'icône est versionnée, mais on la reconstruit à partir de
+          # make_icon.py : cela garantit que le binaire livré porte bien
+          # l'icône décrite par le code, et pas un .ico oublié à jour.
+          python packaging/make_icon.py
+          if (-not (Test-Path packaging/anti-zeevirius.ico)) {
+            throw "L'icône n'a pas été produite."
+          }
+
+      - name: Construire l'exécutable (PyInstaller)
+        shell: pwsh
+        env:
+          AZ_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          pyinstaller --noconfirm --clean packaging/anti-zeevirius.spec
+          if (-not (Test-Path "dist/ANTI-ZEEVIRIUS.exe")) {
+            throw "dist/ANTI-ZEEVIRIUS.exe est absent : la construction a échoué."
+          }
+          Get-Item dist/ANTI-ZEEVIRIUS.exe | Format-List Name, Length, VersionInfo
+
+      - name: Vérifier qu'aucune dépendance critique n'a été oubliée
+        shell: pwsh
+        run: |
+          # PyInstaller ne considère PAS un import caché introuvable comme une
+          # erreur : il écrit un avertissement et construit quand même. On
+          # obtiendrait alors un exécutable qui démarre et répond « module
+          # indisponible » à chaque action — la panne la plus coûteuse à
+          # diagnostiquer, parce qu'elle ressemble à un bug applicatif.
+          $warn = Get-ChildItem build -Recurse -Filter "warn-*.txt" |
+                  Select-Object -First 1
+          if (-not $warn) { throw "Rapport d'analyse PyInstaller introuvable." }
+          # Noms EXACTS, terminés par « - » : « missing module named
+          # numpy._core.zeros » est une note normale de l'analyse de numpy, pas
+          # une dépendance manquante. Un filtre trop large ferait échouer des
+          # constructions parfaitement saines, et on finirait par le désactiver.
+          $motif = '^missing module named (yara|pefile|psutil|requests|watchdog|' +
+                   'win32com\.client|pythoncom|pywintypes|' +
+                   'watchdog\.observers\.read_directory_changes) - '
+          $manquants = Select-String -Path $warn.FullName -Pattern $motif
+          if ($manquants) {
+            Write-Host "::error::Dépendances absentes de l'exécutable :"
+            $manquants | ForEach-Object { Write-Host $_.Line }
+            throw "Construction incomplète — voir ci-dessus."
+          }
+          Write-Host "Toutes les dépendances critiques sont embarquées."
+
+      - name: Installer Inno Setup
+        shell: pwsh
+        run: |
+          # 6.3 minimum : installer.iss utilise ArchitecturesAllowed=x64compatible.
+          choco install innosetup --no-progress -y
+
+      - name: Construire l'installeur (Inno Setup)
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            throw "ISCC.exe introuvable — l'installation d'Inno Setup a échoué."
+          }
+          & $iscc "/DAppVersion=${{ steps.version.outputs.version }}" `
+                  "packaging\installer.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup a échoué ($LASTEXITCODE)." }
+          if (-not (Test-Path "dist/ANTI-ZEEVIRIUS-Setup.exe")) {
+            throw "L'installeur est absent de dist/."
+          }
+
+      - name: Calculer l'empreinte SHA-256
+        shell: pwsh
+        run: |
+          # L'installeur n'étant PAS signé numériquement, cette empreinte est
+          # le seul moyen dont dispose l'utilisateur pour vérifier que le
+          # fichier téléchargé est bien celui que cette machine a produit.
+          # Elle n'atteste pas de l'identité de l'éditeur — seulement de
+          # l'intégrité du transfert.
+          $h = Get-FileHash dist/ANTI-ZEEVIRIUS-Setup.exe -Algorithm SHA256
+          "$($h.Hash)  ANTI-ZEEVIRIUS-Setup.exe" |
+              Out-File -Encoding ascii dist/ANTI-ZEEVIRIUS-Setup.exe.sha256
+          Get-Content dist/ANTI-ZEEVIRIUS-Setup.exe.sha256
+
+      - name: Publier les artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ANTI-ZEEVIRIUS-Setup-${{ steps.version.outputs.version }}
+          path: |
+            dist/ANTI-ZEEVIRIUS-Setup.exe
+            dist/ANTI-ZEEVIRIUS-Setup.exe.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Conserver le rapport d'analyse en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostic-pyinstaller
+          path: build/**/warn-*.txt
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Attacher l'installeur à la Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/ANTI-ZEEVIRIUS-Setup.exe
+            dist/ANTI-ZEEVIRIUS-Setup.exe.sha256
+          body: |
+            Installeur Windows d'ANTI-ZEEVIRIUS ${{ steps.version.outputs.version }}.
+
+            **Cet installeur n'est pas signé numériquement.** Au premier
+            lancement, Windows SmartScreen affichera « Windows a protégé votre
+            ordinateur » et masquera le bouton d'installation derrière
+            « Informations complémentaires ». C'est attendu : cela signifie que
+            l'éditeur n'est pas vérifié, pas que le fichier est dangereux.
+            Vérifiez l'empreinte SHA-256 jointe avant d'exécuter le fichier.
+
+            Windows Defender peut par ailleurs signaler l'application : elle
+            modifie le registre, crée des tâches planifiées et déplace des
+            fichiers en quarantaine — le comportement même qu'un antivirus
+            surveille. Voir `packaging/README.md`.

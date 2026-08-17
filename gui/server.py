@@ -39,7 +39,10 @@ from typing import Dict, Optional, Tuple
 from urllib.parse import unquote, urlparse, parse_qs
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-WEB_DIR = (Path(__file__).resolve().parent / "web")
+# Ressource embarquée : gelé, la page vit dans le dossier temporaire de
+# PyInstaller, pas à côté de ce fichier.
+import paths as _paths
+WEB_DIR = _paths.resource_path("gui", "web")
 
 DEFAULT_PORT = 8777
 HOST = "127.0.0.1"  # NE JAMAIS remplacer par 0.0.0.0

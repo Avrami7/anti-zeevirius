@@ -12,3 +12,6 @@ triage_staging/
 organizer_logs/
 cache/
 signatures/vt_api_key.txt
+
+# Etat d'execution du lanceur (pid, port, jeton de session)
+runtime.json

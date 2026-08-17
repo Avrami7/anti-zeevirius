@@ -13,3 +13,9 @@ numpy>=1.26.0
 # l'outil fonctionne quand même (repli sur la date de modification, avec
 # avertissement explicite affiché à l'écran).
 pywin32>=306 ; sys_platform == "win32"
+# Optionnel — fenêtre applicative native pour la version installée
+# (packaging/launcher.py). S'appuie sur WebView2, présent d'origine sur
+# Windows 10/11. Sans ce paquet, le lanceur ouvre le navigateur par défaut :
+# l'application reste pleinement fonctionnelle, elle a juste l'apparence
+# d'un onglet au lieu d'une fenêtre autonome.
+pywebview>=5.1 ; sys_platform == "win32"

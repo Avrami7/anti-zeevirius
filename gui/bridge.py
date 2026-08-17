@@ -29,6 +29,7 @@ import json
 import os
 import platform
 import secrets
+import sys
 import threading
 import time
 from pathlib import Path
@@ -37,16 +38,26 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from .jobs import JobManager
 
 # ── Chemins : strictement alignés sur ceux de main.py ────────────────
+# Délégués à paths.py, qui distingue les ressources embarquées (lecture
+# seule) des données utilisateur (écriture). Hors exécutable gelé, tout
+# retombe sur le dossier du projet : comportement de développement inchangé.
+import paths as _paths
+
 BASE_DIR = Path(__file__).resolve().parent.parent
-SIGNATURES_DIR = BASE_DIR / "signatures"
-LOGS_DIR = BASE_DIR / "logs"
-QUARANTINE_DIR = BASE_DIR / "quarantine_storage"
-STAGING_DIR = BASE_DIR / "triage_staging"
-CACHE_DIR = BASE_DIR / "cache"
-ORGANIZER_LOG = BASE_DIR / "organizer_logs" / "reorg_index.json"
+SIGNATURES_DIR = _paths.signatures_dir()
+LOGS_DIR = _paths.logs_dir()
+QUARANTINE_DIR = _paths.quarantine_dir()
+STAGING_DIR = _paths.staging_dir()
+CACHE_DIR = _paths.cache_dir()
+ORGANIZER_LOG = _paths.organizer_log()
 HASH_DB_PATH = SIGNATURES_DIR / "malicious_hashes.txt"
 YARA_RULES_PATH = SIGNATURES_DIR / "rules.yar"
-MAIN_SCRIPT = BASE_DIR / "main.py"
+
+# Cible des tâches planifiées (schtasks). Gelé, il n'existe aucun main.py sur
+# le disque : la tâche doit viser l'exécutable lui-même, sinon elle est créée
+# en pointant vers un fichier absent et échoue silencieusement à chaque
+# déclenchement.
+MAIN_SCRIPT = Path(sys.executable) if _paths.is_frozen() else (BASE_DIR / "main.py")
 
 CONFIRM_TTL_SECONDS = 300  # 5 minutes, imposé par le contrat
 

@@ -47,10 +47,12 @@ from optimizer.guardian import SystemGuardian
 from optimizer.app_manager import AppManager
 from optimizer.residue_cleaner import ResidueCleaner
 
+import paths as _paths
+
 BASE_DIR = Path(__file__).parent
-SIGNATURES_DIR = BASE_DIR / "signatures"
-LOGS_DIR = BASE_DIR / "logs"
-QUARANTINE_DIR = BASE_DIR / "quarantine_storage"
+SIGNATURES_DIR = _paths.signatures_dir()
+LOGS_DIR = _paths.logs_dir()
+QUARANTINE_DIR = _paths.quarantine_dir()
 
 HASH_DB_PATH = SIGNATURES_DIR / "malicious_hashes.txt"
 YARA_RULES_PATH = SIGNATURES_DIR / "rules.yar"
@@ -79,7 +81,7 @@ class AntivirusEngine:
         self.temp_cleaner = TempCleaner()
         self.startup_manager = StartupManager()
         self.disk_analyzer = DiskAnalyzer()
-        self.file_triage = FileTriage(str(BASE_DIR / "triage_staging"))
+        self.file_triage = FileTriage(str(_paths.staging_dir()))
         self.reputation_checker = ReputationChecker(
             str(SIGNATURES_DIR / "vt_api_key.txt"),
             str(BASE_DIR / "cache" / "vt_cache.json"),

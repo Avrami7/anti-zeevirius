@@ -47,6 +47,14 @@ WEB_DIR = _paths.resource_path("gui", "web")
 DEFAULT_PORT = 8777
 HOST = "127.0.0.1"  # NE JAMAIS remplacer par 0.0.0.0
 TOKEN_HEADER = "X-AZ-Token"
+
+# Noms d'hôte autorisés dans l'en-tête `Host`. Le serveur n'écoute que sur la
+# boucle locale, mais cela ne suffit pas : une page web quelconque peut faire
+# pointer son propre domaine sur 127.0.0.1 (DNS rebinding) et parler à l'API
+# avec l'en-tête `Host` de son choix, ce qui la rend « same-origin » avec nous
+# et lui donne accès au jeton servi dans la page. On exige donc que `Host`
+# désigne explicitement la boucle locale — un domaine attaquant est rejeté.
+ALLOWED_HOSTNAMES = frozenset({"127.0.0.1", "localhost", "::1"})
 MAX_BODY_BYTES = 8 * 1024 * 1024  # garde-fou contre un corps JSON démesuré
 
 # Marqueur remplacé par le jeton de session dans la page servie.
@@ -182,6 +190,29 @@ class AZRequestHandler(BaseHTTPRequestHandler):
     def _send_html(self, html: str, status: int = 200) -> None:
         self._send(status, html.encode("utf-8"), "text/html; charset=utf-8")
 
+    # ── Anti-DNS-rebinding ───────────────────────────────────────
+    def _host_ok(self) -> bool:
+        """Valide l'en-tête `Host` : il doit désigner la boucle locale.
+
+        Défense contre le DNS rebinding : sans ce contrôle, une page servie
+        par `evil.example` qui rebascule son domaine sur 127.0.0.1 devient
+        same-origin avec nous, peut lire le jeton dans la page (`GET /`) puis
+        piloter toute l'API. Un `Host` étranger n'a aucune raison légitime
+        d'atteindre ce serveur : on le refuse.
+        """
+        raw = self.headers.get("Host")
+        if raw is None:
+            # HTTP/1.0 sans en-tête Host : toléré (aucun navigateur moderne,
+            # donc aucun vecteur de rebinding).
+            return True
+        host = raw.strip()
+        # Retire un éventuel port. Cas IPv6 littéral : [::1]:8777.
+        if host.startswith("["):
+            hostname = host[1:].split("]", 1)[0]
+        else:
+            hostname = host.rsplit(":", 1)[0] if ":" in host else host
+        return hostname.lower() in ALLOWED_HOSTNAMES
+
     # ── Authentification ─────────────────────────────────────────
     def _token_ok(self) -> bool:
         """Comparaison à temps constant du jeton de session."""
@@ -220,6 +251,11 @@ class AZRequestHandler(BaseHTTPRequestHandler):
 
     # ── Routage ──────────────────────────────────────────────────
     def do_GET(self) -> None:
+        if not self._host_ok():
+            self._send_json({"ok": False, "error": "En-tête Host non autorisé.",
+                             "unavailable": False}, status=403)
+            return
+
         parsed = urlparse(self.path)
         path = parsed.path
 
@@ -240,6 +276,11 @@ class AZRequestHandler(BaseHTTPRequestHandler):
         self.do_GET()
 
     def do_POST(self) -> None:
+        if not self._host_ok():
+            self._send_json({"ok": False, "error": "En-tête Host non autorisé.",
+                             "unavailable": False}, status=403)
+            return
+
         parsed = urlparse(self.path)
         path = parsed.path
 

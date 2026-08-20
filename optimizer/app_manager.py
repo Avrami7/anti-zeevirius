@@ -28,8 +28,37 @@ Remove-AppxPackage refuserait de toute façon de les supprimer).
 """
 
 import json
+import re
+import shlex
 import subprocess
 from typing import Dict, List, Optional
+
+def _split_command_line(command: str) -> List[str]:
+    """Découpe une ligne de commande Windows en arguments, SANS shell.
+
+    `shlex.split(posix=False)` découpe correctement, mais CONSERVE les
+    guillemets encadrants dans le jeton : `"C:\\Program Files\\x.exe" /S`
+    donne `['"C:\\Program Files\\x.exe"', '/S']`. Passé tel quel à
+    CreateProcess, Windows chercherait un fichier dont le nom contient
+    littéralement les guillemets — donc échec pour TOUTE application installée
+    dans Program Files, c'est-à-dire la quasi-totalité d'entre elles.
+
+    On retire donc la paire de guillemets encadrants de chaque jeton, ce qui
+    reproduit le comportement de CommandLineToArgvW sur les lignes de commande
+    de désinstallation, qui restent simples (un chemin, des options).
+    """
+    jetons = shlex.split(command, posix=False)
+    nettoyes = []
+    for j in jetons:
+        if len(j) >= 2 and j[0] == '"' and j[-1] == '"':
+            j = j[1:-1]
+        nettoyes.append(j)
+    return nettoyes
+
+
+# Grammaire d'un PackageFullName UWP : Nom_Version_architecture__hashéditeur.
+# Aucun caractère de rupture de shell/PowerShell n'y figure jamais.
+_VALID_PACKAGE_FULL_NAME = re.compile(r"^[A-Za-z0-9._-]+$")
 
 try:
     import winreg
@@ -236,8 +265,24 @@ class AppManager:
         uninstall_string = app.get("uninstall_string", "")
         if not uninstall_string:
             return {"status": "erreur", "message": "Aucune commande de désinstallation trouvée pour cette application."}
+        # SÉCURITÉ : `uninstall_string` est une donnée NON FIABLE. Elle est lue
+        # dans le registre (écrit par un logiciel tiers) et, pire, transite par
+        # l'API web où l'appelant contrôle entièrement le dictionnaire `app`.
+        # Jamais de `shell=True` : cela livrerait cmd.exe et ferait de tout
+        # `& del ...`, `| ...`, `&& ...` une exécution de commande arbitraire.
+        # On découpe la ligne de commande sans shell : les métacaractères ne
+        # sont plus interprétés, seul le désinstalleur nommé s'exécute.
         try:
-            subprocess.Popen(uninstall_string, shell=True)
+            argv = _split_command_line(uninstall_string)
+        except ValueError as e:
+            return {"status": "erreur", "message": f"Commande de désinstallation illisible : {e}"}
+        if not argv:
+            return {"status": "erreur", "message": "Commande de désinstallation vide."}
+        # Quelques désinstalleurs MSI sont enregistrés sous la forme
+        # `MsiExec.exe /X{GUID}` : shlex conserve les accolades, CreateProcess
+        # les accepte telles quelles.
+        try:
+            subprocess.Popen(argv, shell=False)
             return {
                 "status": "ok",
                 "message": f"Désinstalleur de '{app['name']}' lancé — suis l'assistant qui vient de s'ouvrir.",
@@ -252,6 +297,16 @@ class AppManager:
         package_full_name = app.get("package_full_name", "")
         if not package_full_name:
             return {"status": "erreur", "message": "Nom de paquet introuvable."}
+        # SÉCURITÉ : `package_full_name` transite par l'API web, l'appelant le
+        # contrôle. Injecté tel quel dans une chaîne PowerShell entre
+        # apostrophes, un `'` suffit à sortir du littéral et à enchaîner des
+        # commandes arbitraires (`x'; Remove-Item C:\... -Recurse; '`). Un
+        # PackageFullName légitime a une grammaire stricte
+        # (Nom_Version_arch__hashéditeur) : uniquement lettres, chiffres, `.`,
+        # `_`, `-`. On refuse tout le reste avant de toucher au shell.
+        if not _VALID_PACKAGE_FULL_NAME.match(package_full_name):
+            return {"status": "erreur",
+                    "message": "Nom de paquet invalide (caractères non autorisés) — désinstallation refusée."}
         try:
             result = subprocess.run(
                 ["powershell", "-NoProfile", "-Command",

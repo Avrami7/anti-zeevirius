@@ -333,6 +333,7 @@ def print_menu() -> None:
     print(" 33. Tracer les accès FUTURS à mes documents")
     print(" 34. Qui utilise ma caméra / mon micro ?")
     print(" 35. Surveiller la caméra en continu (notification si activation)")
+    print(" 36. Bloquer / débloquer une application (pare-feu)")
     print("  0. Quitter")
     print("=" * 60)
 
@@ -1092,6 +1093,56 @@ def main() -> None:
             finally:
                 cw.arreter()
                 print("\nSurveillance arrêtée.")
+
+        elif choice == "36":
+            from security.app_firewall import AppFirewall
+            af = AppFirewall()
+            res = af.lister_regles()
+            if not res.get("ok"):
+                print(f"\n{res.get('reason') or res.get('error')}")
+                continue
+
+            regles = res["data"]["regles"]
+            print(f"\n{len(regles)} application(s) bloquée(s) par ANTI-ZEEVIRIUS :")
+            for i, r in enumerate(regles):
+                etat = "active" if r["active"] else "désactivée"
+                print(f"  [{i}] {r['application']} ({r['sens']}, {etat})")
+                print(f"       {r['programme']}")
+            print(f"\n{res['data']['note']}")
+
+            print("\n  b = bloquer une application    d = débloquer    Entrée = revenir")
+            action = input("Action : ").strip().lower()
+
+            if action == "b":
+                chemin = input("Chemin complet du programme : ").strip()
+                if not chemin:
+                    continue
+                plan = af.preparer_blocage(chemin)
+                if not plan.get("ok"):
+                    print(f"\nRefusé : {plan.get('error')}")
+                    continue
+                d = plan["data"]
+                if d["deja_bloquee"]:
+                    print("\nCette application est déjà bloquée.")
+                    continue
+                print("\nCe qui sera fait :")
+                for e in d["etapes"]:
+                    print(f"  - {e}")
+                print("\nAvertissements :")
+                for a in d["avertissements"]:
+                    print(f"  ! {a}")
+                if input("\nConfirmer le blocage ? (oui/non) : ").strip().lower() == "oui":
+                    r = af.bloquer(d)
+                    print(f"\n{d['application']} bloquée." if r.get("ok")
+                          else f"\nÉchec : {r.get('error') or r.get('reason')}")
+
+            elif action == "d":
+                idx = input("Index de la règle à retirer : ").strip()
+                if idx.isdigit() and 0 <= int(idx) < len(regles):
+                    cible = regles[int(idx)]
+                    r = af.debloquer(cible["nom"])
+                    print(f"\n{cible['application']} débloquée." if r.get("ok")
+                          else f"\nÉchec : {r.get('error') or r.get('reason')}")
 
         elif choice == "0":
             if engine._realtime_monitor is not None:

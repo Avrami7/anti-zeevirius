@@ -10,6 +10,7 @@ import logging
 import os
 import sys
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
@@ -330,6 +331,8 @@ def print_menu() -> None:
     print("  --- ACCÈS NON DÉSIRÉ ---")
     print(" 32. Qui accède à cet ordinateur ? (sessions, journal, connexions)")
     print(" 33. Tracer les accès FUTURS à mes documents")
+    print(" 34. Qui utilise ma caméra / mon micro ?")
+    print(" 35. Surveiller la caméra en continu (notification si activation)")
     print("  0. Quitter")
     print("=" * 60)
 
@@ -1023,6 +1026,72 @@ def main() -> None:
                     print(f"\n{r['data']['rappel']}")
                 else:
                     print(f"\nÉchec : {r.get('error') or r.get('reason')}")
+
+        elif choice == "34":
+            from security.camera_watch import CameraWatch
+            cw = CameraWatch()
+            d = cw.etat()["data"]
+
+            if d["alertes"]:
+                print(f"\n!!  {len(d['alertes'])} ACCÈS NON AUTORISÉ EN COURS\n")
+                for a in d["alertes"]:
+                    print(f"    {a['appareil_lisible'].upper()} — {a['application']}")
+                    print(f"      {a['chemin']}")
+                    print(f"      depuis {a['debut']}\n")
+            elif d["en_cours"]:
+                print("\nAppareils utilisés, toutes applications autorisées :")
+                for a in d["en_cours"]:
+                    print(f"  {a['appareil_lisible']} — {a['application']}")
+            else:
+                print("\nNi la caméra ni le microphone ne sont utilisés.")
+
+            if d["acces"]:
+                print("\nHistorique :")
+                for a in d["acces"]:
+                    etat = "EN COURS" if a["en_cours"] else "terminé "
+                    marque = "" if a["autorisee"] else "  <-- non autorisée"
+                    print(f"  [{etat}] {a['appareil_lisible']:11s} "
+                          f"{a['application']}{marque}")
+
+            muettes = [k for k, v in d["sources"].items() if v != "ok"]
+            if muettes:
+                print("\nSources indisponibles (rapport partiel) :")
+                for k in muettes:
+                    print(f"  - {k} : {d['sources'][k]}")
+
+            print(f"\n{d['rappel']}")
+
+            if d["alertes"]:
+                rep = input("\nAutoriser une de ces applications ? "
+                            "(nom exact, ou Entrée) : ").strip()
+                if rep:
+                    r = cw.autoriser(rep)
+                    print("Autorisée." if r.get("ok") else r.get("error"))
+
+        elif choice == "35":
+            from security.camera_watch import CameraWatch
+            cw = CameraWatch()
+            print("\nSurveillance de la caméra et du microphone.")
+            print("Une notification s'affichera si une application NON autorisée")
+            print("les active. Ctrl+C pour arrêter.\n")
+            autorisees = cw.autorisations()
+            print(f"Applications autorisées : "
+                  f"{', '.join(autorisees) if autorisees else 'aucune pour l instant'}")
+            print("(utilise l'option 34 pour en déclarer)\n")
+
+            def signaler(a):
+                print(f"  [!] {a['appareil_lisible'].upper()} activée par "
+                      f"{a['application']} — {a['chemin']}")
+
+            cw.surveiller(rappel=signaler, intervalle=5.0)
+            try:
+                while cw.surveillance_active:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                pass
+            finally:
+                cw.arreter()
+                print("\nSurveillance arrêtée.")
 
         elif choice == "0":
             if engine._realtime_monitor is not None:

@@ -46,6 +46,15 @@ jobs:
           python-version: "3.11"
           cache: pip
 
+      # Le plus tôt possible, juste après Python : ce contrôle ne dépend que de
+      # la bibliothèque standard. Une faute de syntaxe dans installer.iss ne se
+      # voyait auparavant qu'après les tests, PyInstaller et le téléchargement
+      # d'Inno Setup — trois minutes pour apprendre qu'une accolade était mal
+      # placée. C'est exactement ainsi que le tout premier build a échoué.
+      - name: Vérifier le script Inno Setup (sans Windows)
+        shell: pwsh
+        run: python packaging/lint_iss.py
+
       - name: Déterminer le numéro de version
         id: version
         shell: pwsh

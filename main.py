@@ -327,6 +327,9 @@ def print_menu() -> None:
     print(" 30. Détecter les dossiers orphelins (Program Files / AppData)")
     print("  --- BASES DE DÉTECTION ---")
     print(" 31. Mettre à jour les signatures (empreintes + règles YARA)")
+    print("  --- ACCÈS NON DÉSIRÉ ---")
+    print(" 32. Qui accède à cet ordinateur ? (sessions, journal, connexions)")
+    print(" 33. Tracer les accès FUTURS à mes documents")
     print("  0. Quitter")
     print("=" * 60)
 
@@ -971,6 +974,55 @@ def main() -> None:
                 if ry.get("echecs_reseau"):
                     for e in ry["echecs_reseau"]:
                         print(f"    - {e}")
+
+        elif choice == "32":
+            from security.intrusion_check import IntrusionCheck
+            print("\nRecherche des accès à cet ordinateur...\n")
+            d = IntrusionCheck().rapport(jours=7)["data"]
+
+            if not d["constats"]:
+                print("Aucun constat.")
+            for c in d["constats"]:
+                marque = {"important": "[!]", "a_verifier": "[?]",
+                          "information": "[ ]"}[c["niveau"]]
+                print(f"{marque} {c['titre']}")
+                print(f"      {c['detail']}\n")
+
+            indisponibles = [k for k, v in d["sources"].items() if v != "ok"]
+            if indisponibles:
+                # Ne jamais masquer une source muette : un rapport incomplet
+                # présenté comme complet est pire qu'un rapport absent.
+                print("Sources indisponibles (rapport partiel) :")
+                for k in indisponibles:
+                    print(f"  - {k} : {d['sources'][k]}")
+                print()
+            print(d["avertissement"])
+
+        elif choice == "33":
+            from security.intrusion_check import IntrusionCheck
+            ic = IntrusionCheck()
+            print("\nTracer les accès FUTURS à un dossier.")
+            print("Rappel : le passé n'a jamais été enregistré par Windows,")
+            print("il est donc définitivement irrécupérable.\n")
+            dossier = input("Dossier à tracer (Entrée pour annuler) : ").strip()
+            if not dossier:
+                continue
+            plan = ic.preparer_audit_fichiers([dossier])
+            if not plan.get("ok"):
+                print(plan.get("error"))
+                continue
+            print("\nCe qui sera fait :")
+            for e in plan["data"]["etapes"]:
+                print(f"  - {e}")
+            print("\nAvertissements :")
+            for a in plan["data"]["avertissements"]:
+                print(f"  ! {a}")
+            if input("\nConfirmer ? (oui/non) : ").strip().lower() == "oui":
+                r = ic.activer_audit_fichiers(plan["data"])
+                if r.get("ok"):
+                    print(f"\n{r['data']['rappel']}")
+                else:
+                    print(f"\nÉchec : {r.get('error') or r.get('reason')}")
 
         elif choice == "0":
             if engine._realtime_monitor is not None:

@@ -106,3 +106,101 @@ POST /api/job_cancel       → { "ok": true }
   "vt_configured": false
 } }
 ```
+
+---
+
+# Extension V2 — sécurité avancée, historique unifié
+
+Ajoutée après coup, dans le respect strict des principes ci-dessus : aucune
+nouvelle dépendance, aucune requête réseau, la même enveloppe, le même
+mécanisme de double validation.
+
+## Deux règles propres à cette extension
+
+**1. Les modules V2 rendent DÉJÀ l'enveloppe du contrat. Le pont ne la
+réécrit pas.** `network_watch`, `camera_watch`, `intrusion_check` et
+`comfort/history` rendent `{"ok": true, "data": {...}}` : la réponse est
+transmise **telle quelle**, sans copie ni filtrage. `incident_mode`, lui,
+rend `{"ok": true, <champs métier à plat>}` : ses champs sont alors déplacés
+sous `data` **sans être renommés, ni filtrés, ni complétés**, pour que la
+couche web ne connaisse qu'une seule forme de réponse. En échec, `error` est
+garanti non vide (certains modules ne renseignent que `message`), et les
+autres champs de l'échec sont conservés sous `data` — le rétablissement
+partiel du mode incident dit précisément *ce qui reste en place*, cette
+information ne doit pas se perdre.
+
+**2. Un résultat partiel n'est jamais présenté comme complet.** Ces modules
+travaillent avec des sources qui peuvent se taire (droits insuffisants,
+PowerShell absent, Windows uniquement). Chaque réponse porte donc un
+dictionnaire `sources` (ou `problemes` pour l'historique) qui nomme ce qui a
+répondu et ce qui n'a pas pu. **Le frontend a l'obligation de l'afficher.**
+Un rapport incomplet présenté comme complet est pire qu'un rapport absent.
+
+## Actions
+
+| Action | Corps | Module appelé | Destructif |
+|---|---|---|---|
+| `network_connections` | — | `NetworkWatch.lister_connexions` | non |
+| `network_apps` | — | `.resumer_par_application` | non |
+| `intrusion_report` | `{jours}` (1–365, défaut 7) | `IntrusionCheck.rapport` | non |
+| `intrusion_audit_enable` | `{folders[], dry_run, confirm_token}` | `.preparer_audit_fichiers` puis `.activer_audit_fichiers` | **oui** (réversible) |
+| `camera_state` | — | `CameraWatch.etat` (+ `surveillance_active`) | non |
+| `camera_recent` | `{heures}` (1–720, défaut 24) | `.utilisations_recentes` | non |
+| `camera_allow` | `{app}` | `.autoriser` | non |
+| `camera_revoke` | `{app}` | `.retirer_autorisation` | non |
+| `camera_watch_start` | — | `.surveiller` | non |
+| `camera_watch_stop` | — | `.arreter` | non |
+| `incident_state` | — | `incident_mode.etat` | non |
+| `incident_plan` | — | `.preparer` (lecture seule) | non |
+| `incident_activate` | `{dry_run, confirm_token}` | `.activer` | non, mais **double validation** |
+| `incident_restore` | — | `.retablir` | non |
+| `history_list` | `{limite, filtre}` | `HistoriqueUnifie.lister` | non |
+| `history_undo` | `{id}` | `.annuler` | non (elle REMET en place) |
+
+### `intrusion_audit_enable` — la seule action destructive de la V2
+Elle modifie une stratégie système (`auditpol`) et les règles d'audit des
+dossiers indiqués. Elle suit donc la règle 4 sans aménagement : `dry_run`
+rend le plan du module (dossiers, étapes, avertissements) accompagné d'un
+`confirm_token` à usage unique, lié aux dossiers demandés ; l'exécution exige
+`dry_run: false` **et** ce jeton.
+
+### `incident_activate` — non destructif, mais soumis à la même validation
+Le Mode Incident est entièrement réversible : rien n'est supprimé, les
+processus sont *suspendus* et non arrêtés. Il coupe cependant le réseau de la
+machine, ce qui est assez brutal pour mériter le plan affiché et l'accusé de
+lecture — et cela évite un second mécanisme de confirmation dans l'interface.
+
+**Une exception assumée** au principe « le plan affiché est le plan
+exécuté » : la liste des processus est *recalculée* au moment de l'exécution.
+Dans une urgence, geler la photographie prise trois minutes plus tôt serait
+moins juste que geler ce qui écrit maintenant. Le plan reste exact sur tout
+le reste (étapes, disponibilité de chacune, avertissements).
+
+`incident_restore` n'exige **aucune** confirmation : c'est la porte de
+secours, elle doit rester à un clic.
+
+### Plans : clés de présentation
+Le `plan` d'une action destructive contient le plan rendu par le module,
+**intact**, plus quelques clés que sait lire la modale de confirmation :
+`items[]` (`path`, `reason`), `count`, `steps[]`, `note`. Elles s'ajoutent,
+elles ne remplacent rien : `incident_activate` conserve le plan complet du
+module sous `sequence`.
+
+### Exécution d'une action V2 destructive
+`{"ok": true, "data": {"dry_run": false, "action": "...", "result": <enveloppe du module>}}`
+— `result` porte l'enveloppe rendue par le module, y compris son propre `ok`
+(l'audit peut réussir sur un dossier et échouer sur un autre).
+
+## Champs ajoutés à `status`
+
+```json
+{ "incident": { "actif": false, "depuis": null, "reseau_coupe": false,
+                "nb_geles": 0, "corrompu": false, "message": "Mode incident inactif." },
+  "camera_watch_active": false }
+```
+
+`incident` est relu à chaque rafraîchissement d'état (lecture d'un fichier
+JSON, aucun appel système) : un mode incident resté actif d'une session
+précédente est ainsi visible depuis n'importe quel panneau, sans que
+l'utilisateur ait à ouvrir celui de la sécurité avancée. L'interface appelle
+en outre `incident_state` **au démarrage**, avant tout le reste.

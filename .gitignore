@@ -19,3 +19,4 @@ runtime.json
 # Donnees produites par les modules V2
 history/
 incident/
+camera/

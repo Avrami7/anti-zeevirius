@@ -529,7 +529,7 @@ document.addEventListener('keydown', function (e) {
 /* ══════════════════════════════════════════════════════════════════════════
    NAVIGATION
    ══════════════════════════════════════════════════════════════════════════ */
-var VIEWS = ['tableau-de-bord', 'protection', 'nettoyage', 'rangement', 'systeme'];
+var VIEWS = ['tableau-de-bord', 'historique', 'protection', 'securite', 'nettoyage', 'rangement', 'systeme'];
 
 function route() {
   var name = (location.hash || '').replace(/^#\//, '');
@@ -585,7 +585,10 @@ var MODULE_LABELS = {
   disk_analyzer: 'Analyse disque', residue_cleaner: 'Résidus d\'applications',
   app_manager: 'Gestion des applications', file_triage: 'Tri de fichiers',
   folder_organizer: 'Réorganisation', startup_manager: 'Programmes au démarrage',
-  task_scheduler: 'Planificateur de tâches', guardian: 'Mode gardien'
+  task_scheduler: 'Planificateur de tâches', guardian: 'Mode gardien',
+  network_watch: 'Connexions sortantes', intrusion_check: 'Accès à cette machine',
+  camera_watch: 'Caméra et microphone', incident_mode: 'Mode Incident',
+  history: 'Historique unifié'
 };
 
 /* Les panneaux portent une clé d'interface (data-mod) ; le backend, lui,
@@ -734,9 +737,18 @@ function paintStatus(d) {
     ['Réputation cloud', d.vt_configured ? 'ok' : 'info', d.vt_configured ? 'configurée' : 'non configurée'],
     ['Quarantaine', (d.quarantine_count || 0) > 0 ? 'danger' : 'ok', num(d.quarantine_count || 0) + ' élément(s)']
   ];
+  if (d.incident && d.incident.actif) {
+    tags.unshift(['Mode Incident', 'danger', 'ACTIF']);
+  }
   $('postureTags').innerHTML = tags.map(function (t) {
     return '<span class="chip" data-tone="' + t[1] + '">' + esc(t[0]) + ' · ' + esc(t[2]) + '</span>';
   }).join('');
+
+  /* Mode incident : l'état accompagne chaque rafraîchissement (toutes les
+     45 s). Un mode resté actif ne peut donc pas passer inaperçu, même si
+     l'utilisateur n'a jamais ouvert le panneau Sécurité avancée. */
+  if (d.incident) paintIncident(d.incident);
+  setCamLamp(!!d.camera_watch_active);
 
   /* La pastille décrit la LIAISON, pas la posture de sécurité : le backend a
      répondu, donc elle est verte même si l'indice de protection est bas. */
@@ -1872,6 +1884,659 @@ $('btnGdConfirm').addEventListener('click', function () {
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
+   SÉCURITÉ AVANCÉE (V2) — mode incident, caméra, connexions, intrusion
+
+   Cinq modules livrés, une seule règle de présentation : ces modules rendent
+   souvent un résultat PARTIEL (droits insuffisants, Windows uniquement). Ce
+   qui n'a pas pu être interrogé est donc toujours affiché — jamais masqué.
+   Un rapport incomplet présenté comme complet est pire qu'un rapport absent.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+var SOURCE_LABELS = {
+  sessions: 'Sessions ouvertes', logiciels: 'Accès à distance',
+  connexions: 'Connexions entrantes', journal: 'Journal de sécurité',
+  comptes: 'Comptes locaux', webcam: 'Caméra', microphone: 'Microphone',
+  quarantaine: 'Quarantaine', sas: 'Sas de tri', rangement: 'Rangement',
+  demarrage: 'Démarrage Windows', journal_v2: 'Journal V2', filtre: 'Filtre'
+};
+
+function srcLabel(k) { return SOURCE_LABELS[k] || String(k); }
+
+/* Rend la carte des sources d'un rapport. `sources` = { nom: "ok" | motif }. */
+function sourcesBlock(sources, titre) {
+  var keys = Object.keys(sources || {});
+  if (!keys.length) return '';
+  var manquantes = keys.filter(function (k) { return String(sources[k]) !== 'ok'; });
+  var rows = keys.map(function (k) {
+    var v = String(sources[k] == null ? '' : sources[k]);
+    var vivante = (v === 'ok');
+    return '<div class="src' + (vivante ? '' : ' is-off') + '">' +
+      icon(vivante ? 'check' : 'alert') +
+      '<span class="src-n">' + esc(srcLabel(k)) + '</span>' +
+      '<span class="src-v">' + esc(vivante ? 'a répondu' : v) + '</span></div>';
+  }).join('');
+  return '<div class="srcs"><p class="srcs-h' + (manquantes.length ? ' is-partial' : '') + '">' +
+    esc(titre || 'Sources interrogées') + ' — ' +
+    (manquantes.length
+      ? num(manquantes.length) + ' sur ' + num(keys.length) + ' n\'ont pas pu répondre : ce rapport est PARTIEL'
+      : 'toutes ont répondu') +
+    '</p>' + rows + '</div>';
+}
+
+/* Variante pour l'historique, dont les sources en panne arrivent en liste. */
+function problemsBlock(problemes) {
+  problemes = problemes || [];
+  if (!problemes.length) return '';
+  var rows = problemes.map(function (p) {
+    return '<div class="src is-off">' + icon('alert') +
+      '<span class="src-n">' + esc(p.libelle || srcLabel(p.source)) + '</span>' +
+      '<span class="src-v">' + esc(p.message || 'source indisponible') + '</span></div>';
+  }).join('');
+  return '<div class="srcs"><p class="srcs-h is-partial">Sources en défaut — ' +
+    num(problemes.length) + ' mécanisme(s) n\'ont pas pu être lus : cette vue est PARTIELLE</p>' +
+    rows + '</div>';
+}
+
+/* Enveloppe rendue par un module V2 à l'intérieur d'une exécution destructive :
+   { dry_run:false, action, result: { ok, data } }. */
+function v2Result(d) {
+  var env = (d && d.result) || {};
+  return { ok: env.ok !== false, data: env.data || {}, error: env.error || env.reason || '' };
+}
+
+
+/* ══ MODE INCIDENT ═══════════════════════════════════════════════════════
+   Le bouton d'urgence. Il est en barre du haut, visible depuis n'importe
+   quel panneau, et ne déclenche jamais rien au clic : il ouvre la modale de
+   validation, qui affiche la séquence exacte avant la moindre coupure.
+   ════════════════════════════════════════════════════════════════════════ */
+var INCIDENT = null;
+
+function paintIncident(d) {
+  d = d || {};
+  /* Fusion et non remplacement : `status` ne transporte qu'un sous-ensemble
+     de l'état (pas la commande de retrait manuel, par exemple). Sans cette
+     fusion, le rafraîchissement automatique effaçait des informations que
+     seul `incident_state` fournit. */
+  INCIDENT = Object.assign({}, INCIDENT || {}, d);
+  d = INCIDENT;
+  var actif = !!d.actif, corrompu = !!d.corrompu;
+  var message = d.message || (actif ? 'Mode incident actif.' : 'Mode incident inactif.');
+
+  var btn = $('btnIncident');
+  if (btn) btn.dataset.actif = actif ? 'true' : 'false';
+
+  var box = $('incState');
+  if (box) {
+    box.dataset.actif = actif ? 'true' : (corrompu ? 'warn' : 'false');
+    $('incStateVal').textContent = actif
+      ? 'ACTIF' + (d.depuis ? ' depuis le ' + shortDate(d.depuis) : '')
+      : (corrompu ? 'État illisible' : 'Inactif');
+    $('incStateMsg').textContent = message;
+  }
+
+  var banner = $('incidentBanner');
+  if (!banner) return;
+  if (actif || corrompu) {
+    banner.hidden = false;
+    $('incidentBannerTitle').textContent = actif
+      ? 'Mode Incident ACTIF — le réseau de cette machine est coupé'
+      : 'Mode Incident : fichier d\'état illisible';
+    $('incidentBannerMsg').textContent = message +
+      (d.retrait_manuel ? ' Retrait manuel de la règle : ' + d.retrait_manuel : '');
+  } else {
+    banner.hidden = true;
+  }
+}
+
+/* Lu au démarrage de l'interface : un mode incident hérité d'une session
+   précédente doit être annoncé tout de suite, avec sa sortie à portée de clic. */
+function loadIncidentState(annoncer) {
+  return call('incident_state', {}).then(function (res) {
+    if (!res.ok) {
+      handleFail(res, annoncer ? null : 'incResult', 'Mode Incident');
+      return null;
+    }
+    var d = res.data || {};
+    paintIncident(d);
+    if (annoncer && (d.actif || d.corrompu)) {
+      toast(d.actif ? 'Mode Incident actif' : 'Mode Incident — état illisible',
+        d.message || '', 'danger');
+      showResult('incResult', 'danger',
+        d.actif ? 'Mode Incident hérité d\'une session précédente' : 'Fichier d\'état illisible',
+        '<p>' + esc(d.message || '') + '</p>' +
+        kv([['Depuis', esc(d.depuis ? shortDate(d.depuis) : 'date inconnue')],
+            ['Réseau', d.reseau_coupe ? 'coupé' : 'intact'],
+            ['Processus gelés', num(d.nb_geles || 0)],
+            ['Étape atteinte', esc(d.etape_atteinte || '—')]]) +
+        '<p>Le bouton <b>Rétablir</b> retire la règle de pare-feu et relance les processus gelés. ' +
+        'Si l\'application ne parvient pas à le faire, la règle se retire aussi à la main : ' +
+        '<span class="mono">' + esc(d.retrait_manuel || '') + '</span></p>');
+    }
+    return d;
+  });
+}
+
+function renderIncidentPlan(d) {
+  var reseau = d.reseau || {}, gel = d.gel || {},
+      sauvegarde = d.sauvegarde || {}, rapport = d.rapport || {};
+  var etapes = [
+    ['1 — Couper le réseau', reseau.disponible, reseau.action, 'règle « ' + (reseau.regle || '') + ' » ; la carte réseau n\'est pas désactivée'],
+    ['2 — Geler les processus', gel.disponible, gel.action, (d.processus || []).length + ' processus candidat(s), liste noire stricte des processus critiques'],
+    ['3 — Sauvegarde', sauvegarde.disponible, sauvegarde.action, (sauvegarde.dossiers || []).length + ' dossier(s) personnel(s)'],
+    ['4 — Rapport', true, rapport.action, 'écrit dans ' + (rapport.dossier || '—')]
+  ];
+  var lignes = etapes.map(function (e) {
+    var dispo = e[1] !== false;
+    return '<div class="trow is-multi is-desc' + (dispo ? '' : ' is-warm') + '">' +
+      '<span class="chip" data-tone="' + (dispo ? 'ok' : 'warn') + '">' +
+      esc(dispo ? 'exécutable' : 'indisponible ici') + '</span>' +
+      '<span class="tmain"><b>' + esc(e[0]) + '</b><small>' + esc(e[2] || '') + '</small></span>' +
+      '<span class="treason">' + esc(e[3] || '') + '</span></div>';
+  }).join('');
+
+  var procs = (d.processus || []).map(function (p) {
+    return '<div class="trow is-multi"><span class="chip" data-tone="warn">PID ' + esc(p.pid) + '</span>' +
+      '<span class="tmain"><b>' + esc(p.nom || '?') + '</b><small>' + esc(p.chemin || '') + '</small></span>' +
+      '<span class="treason">' + esc(p.raison || 'processus candidat au gel') + '</span></div>';
+  });
+
+  var avert = (d.avertissements || []).map(function (a) {
+    return '<li>' + esc(a) + '</li>';
+  }).join('');
+
+  showResult('incResult', d.deja_actif ? 'warn' : 'info', 'Plan du Mode Incident — rien n\'a été touché',
+    kv([['Plateforme', esc(d.plateforme || '—')],
+        ['Droits', d.administrateur ? 'administrateur' : 'standard'],
+        ['Déjà actif', d.deja_actif ? 'oui' : 'non'],
+        ['Fichier d\'état', '<span class="mono">' + esc(d.etat_persistant || '—') + '</span>']]) +
+    '<div class="tbl">' + lignes + '</div>' +
+    (procs.length ? subTable('Processus qui seraient gelés', procs)
+                  : '<p class="p-note">Aucun processus candidat au gel : les autres étapes s\'exécuteraient quand même.</p>') +
+    (avert ? '<div class="warnbox"><p class="warnbox-h">Avertissements du module</p><ul>' + avert + '</ul></div>' : ''));
+}
+
+function renderIncidentDone(data) {
+  var env = v2Result(data);
+  var r = env.data || {};
+  var etapes = r.etapes || {};
+  var ordre = r.ordre || ['reseau', 'processus', 'sauvegarde', 'rapport'];
+  var NOMS = { reseau: 'Réseau', processus: 'Gel des processus', sauvegarde: 'Sauvegarde VSS', rapport: 'Rapport' };
+
+  var lignes = ordre.map(function (k) {
+    var e = etapes[k] || {};
+    var bon = e.ok !== false;
+    var tone = bon ? 'ok' : (e.unavailable ? 'warn' : 'danger');
+    var txt = e.message || e.reason || e.error || (bon ? 'étape exécutée' : 'étape en échec');
+    return '<div class="trow is-multi is-desc' + (bon ? '' : ' is-warm') + '">' +
+      '<span class="chip" data-tone="' + tone + '">' + esc(bon ? 'fait' : (e.unavailable ? 'indisponible' : 'échec')) + '</span>' +
+      '<span class="tmain"><b>' + esc(NOMS[k] || k) + '</b></span>' +
+      '<span class="treason">' + esc(txt) + '</span></div>';
+  }).join('');
+
+  var conseils = (r.conseils || []).map(function (c) { return '<li>' + esc(c) + '</li>'; }).join('');
+
+  showResult('incResult', r.degrade ? 'warn' : 'danger',
+    'Mode Incident activé — ' + num(r.nb_geles || 0) + ' processus gelé(s)',
+    kv([['Horodatage', esc(r.horodatage || '—')],
+        ['Durée', esc((r.duree_s != null ? r.duree_s : '—') + ' s')],
+        ['Étapes en échec', esc((r.etapes_en_echec || []).join(', ') || 'aucune')],
+        ['Fichier d\'état', '<span class="mono">' + esc(r.etat_persistant || '—') + '</span>']]) +
+    '<div class="tbl">' + lignes + '</div>' +
+    (conseils ? '<div class="warnbox"><p class="warnbox-h">À faire maintenant</p><ul>' + conseils + '</ul></div>' : ''));
+  toast('Mode Incident', 'Séquence exécutée. Utilisez « Rétablir » pour tout remettre en place.', 'danger');
+}
+
+function triggerIncident() {
+  return destructive({
+    action: 'incident_activate',
+    body: {},
+    title: 'Déclencher le Mode Incident',
+    lead: 'Voici la séquence exacte, dans l\'ordre où elle s\'exécutera. Rien n\'a encore été touché. ' +
+          'La coupure réseau est immédiate, et la sortie du mode tient en un clic.',
+    label: 'Mode Incident',
+    reversible: true,
+    unit: 'étape',
+    countLabel: 'Étapes de la séquence',
+    planTitle: 'Processus candidats au gel',
+    execLabel: 'Déclencher maintenant',
+    revNote: 'Réversible : « Rétablir » retire la règle de pare-feu et relance les processus gelés — ' +
+             'ils sont suspendus, jamais arrêtés. Mais la coupure du réseau est immédiate : travail en ' +
+             'ligne non enregistré perdu, appels coupés, téléchargements interrompus.',
+    resultId: 'incResult',
+    onDone: function (d) {
+      renderIncidentDone(d);
+      loadIncidentState(false);
+      loadStatus(true);
+    }
+  });
+}
+
+function restoreIncident(btn) {
+  if (btn) { btn.disabled = true; }
+  return call('incident_restore', {}).then(function (res) {
+    if (btn) { btn.disabled = false; }
+    if (!res.ok) {
+      /* Rétablissement PARTIEL : le module conserve l'état plutôt que de
+         prétendre que tout est revenu. On affiche ce qui reste en place. */
+      var d = res.data || {};
+      showResult('incResult', 'danger', 'Rétablissement partiel',
+        '<p>' + esc(d.message || res.error || '') + '</p>' +
+        kv([['Processus encore gelés', num((d.restants || []).length)],
+            ['Retrait manuel', '<span class="mono">' + esc((INCIDENT && INCIDENT.retrait_manuel) || '') + '</span>']]));
+      toast('Mode Incident', d.message || res.error || 'Rétablissement incomplet.', 'danger');
+      loadIncidentState(false);
+      return;
+    }
+    var d2 = res.data || {};
+    showResult('incResult', 'ok', 'Mode Incident levé',
+      '<p>' + esc(d2.message || 'Réseau rétabli, processus relancés.') + '</p>' +
+      kv([['Processus relancés', num((d2.relances || []).length)],
+          ['Réseau', 'rétabli']]));
+    toast('Mode Incident', d2.message || 'Tout est remis en place.', 'ok');
+    loadIncidentState(false);
+    loadStatus(true);
+  });
+}
+
+$('btnIncident').addEventListener('click', function () { triggerIncident(); });
+$('btnIncidentGo').addEventListener('click', function () { triggerIncident(); });
+$('btnIncidentRestore').addEventListener('click', function () { restoreIncident(this); });
+$('btnIncidentRestoreTop').addEventListener('click', function () { restoreIncident(this); });
+
+$('btnIncidentPlan').addEventListener('click', function () {
+  call('incident_plan', {}).then(function (res) {
+    if (!res.ok) { handleFail(res, 'incResult', 'Mode Incident'); return; }
+    renderIncidentPlan(res.data || {});
+  });
+});
+
+
+/* ══ CAMÉRA ET MICROPHONE ════════════════════════════════════════════════ */
+function setCamLamp(on) {
+  var l = $('camLamp');
+  if (l) l.dataset.on = on ? 'true' : 'false';
+}
+
+function camRow(a) {
+  var alerte = a.en_cours && !a.autorisee;
+  var tone = alerte ? 'danger' : (a.en_cours ? 'warn' : 'info');
+  var etat = a.en_cours ? 'EN COURS' : 'terminé';
+  var quand = a.debut ? shortDate(a.debut) : 'date inconnue';
+  return '<div class="trow' + (alerte ? ' is-hot' : (a.en_cours ? ' is-warm' : '')) + '">' +
+    '<span class="chip" data-tone="' + tone + '">' + esc(etat) + '</span>' +
+    '<span class="tmain"><b>' + esc(a.application || '?') + '</b><small title="' +
+      esc((a.appareil_lisible || a.appareil || '') + ' · ' + quand) + '">' +
+      esc((a.appareil_lisible || a.appareil || '') + ' · ' + quand) + '</small></span>' +
+    '<span class="tact">' + (a.autorisee
+      ? '<span class="chip" data-tone="ok">autorisée</span>'
+      : '<button class="btn btn-ghost btn-sm" data-camallow="' + esc(a.application || '') + '">Autoriser</button>') +
+    '</span></div>';
+}
+
+function renderCamera(d, titre) {
+  var acces = d.acces || [];
+  var alertes = d.alertes || acces.filter(function (a) { return a.en_cours && !a.autorisee; });
+
+  /* Un accès non autorisé en cours : le signal le plus fort de l'interface. */
+  var alarm = $('camAlarm');
+  if (alertes.length) {
+    alarm.hidden = false;
+    alarm.innerHTML = '<div class="alarm-h">' + icon('alert') +
+      '<span>' + num(alertes.length) + ' accès NON AUTORISÉ en cours</span></div>' +
+      '<div class="alarm-l">' + alertes.map(function (a) {
+        return '<div class="alarm-i"><b>' + esc(a.application || '?') + '</b>' +
+          '<small>' + esc((a.appareil_lisible || a.appareil || '') +
+            ' · depuis ' + (a.debut ? shortDate(a.debut) : 'date inconnue')) + '</small>' +
+          '<span class="tact"><button class="btn btn-ghost btn-sm" data-camallow="' +
+            esc(a.application || '') + '">Déclarer légitime</button></span></div>';
+      }).join('') + '</div>' +
+      '<p class="alarm-n">Une application tient la caméra ou le micro <b>en ce moment</b> sans avoir été ' +
+      'déclarée. La cause la plus fréquente reste une visioconférence laissée ouverte : dans ce cas, ' +
+      'déclare-la légitime. Sinon, ferme-la et lance une analyse.</p>';
+  } else {
+    alarm.hidden = true;
+    alarm.innerHTML = '';
+  }
+
+  var t = $('camTable');
+  t.innerHTML = acces.length
+    ? scroller(acces.map(camRow).join(''))
+    : '<p class="empty">Aucun accès enregistré sur la période. Sous Windows, cette liste vient du registre ' +
+      'de confidentialité (ConsentStore) — la même source que l\'indicateur de la barre des tâches.</p>';
+
+  var autorisees = d.autorisees || [];
+  $('camAllowed').innerHTML = autorisees.length
+    ? autorisees.map(function (a) {
+        return '<div class="trow"><span class="chip" data-tone="ok">autorisée</span>' +
+          '<span class="tmain"><b>' + esc(a) + '</b></span>' +
+          '<span class="tact"><button class="btn btn-ghost btn-sm" data-camrevoke="' + esc(a) + '">Retirer</button></span></div>';
+      }).join('')
+    : '<p class="empty">Aucune application déclarée légitime.</p>';
+
+  var manquantes = Object.keys(d.sources || {}).filter(function (k) {
+    return String(d.sources[k]) !== 'ok';
+  }).length;
+  showResult('camResult', alertes.length ? 'danger' : (manquantes ? 'warn' : 'ok'),
+    titre || 'Relevé caméra et microphone',
+    kv([['Accès listés', num(acces.length)],
+        ['En cours', num((d.en_cours || acces.filter(function (a) { return a.en_cours; })).length)],
+        ['Non autorisés', num(alertes.length)],
+        ['Applications déclarées', num(autorisees.length)]]) +
+    sourcesBlock(d.sources, 'Appareils interrogés') +
+    (d.rappel ? '<p class="p-note">' + esc(d.rappel) + '</p>' : ''));
+}
+
+function loadCamera(silent) {
+  return call('camera_state', {}).then(function (res) {
+    if (!res.ok) { handleFail(res, 'camResult', 'Caméra'); return; }
+    var d = res.data || {};
+    setCamLamp(!!d.surveillance_active);
+    renderCamera(d, 'État actuel de la caméra et du microphone');
+    if (!silent && (d.alertes || []).length) {
+      toast('Caméra', num(d.alertes.length) + ' accès non autorisé en cours.', 'danger');
+    }
+  });
+}
+
+$('btnCamState').addEventListener('click', function () { loadCamera(false); });
+
+$('btnCamRecent').addEventListener('click', function () {
+  var heures = Number($('camHours').value) || 24;
+  call('camera_recent', { heures: heures }).then(function (res) {
+    if (!res.ok) { handleFail(res, 'camResult', 'Caméra'); return; }
+    var d = res.data || {};
+    renderCamera(d, 'Utilisations des ' + num(d.periode_heures || heures) + ' dernières heures');
+  });
+});
+
+function camAllow(app) {
+  if (!app) { toast('Caméra', 'Indiquez le nom de l\'application.', 'warn'); return; }
+  call('camera_allow', { app: app }).then(function (res) {
+    if (!res.ok) { handleFail(res, 'camResult', 'Caméra'); return; }
+    toast('Caméra', '« ' + app + ' » est déclarée légitime : elle ne déclenchera plus d\'alerte.', 'ok');
+    $('camApp').value = '';
+    loadCamera(true);
+  });
+}
+
+$('btnCamAllow').addEventListener('click', function () { camAllow($('camApp').value.trim()); });
+
+$('pCamera').addEventListener('click', function (e) {
+  var a = e.target.closest('[data-camallow]');
+  var r = e.target.closest('[data-camrevoke]');
+  if (a) camAllow(a.dataset.camallow);
+  if (r) {
+    call('camera_revoke', { app: r.dataset.camrevoke }).then(function (res) {
+      if (!res.ok) { handleFail(res, 'camResult', 'Caméra'); return; }
+      toast('Caméra', 'Autorisation retirée pour « ' + r.dataset.camrevoke + ' ».', 'warn');
+      loadCamera(true);
+    });
+  }
+});
+
+$('btnCamWatch').addEventListener('click', function () {
+  call('camera_watch_start', {}).then(function (res) {
+    if (!res.ok) { handleFail(res, 'camResult', 'Caméra'); return; }
+    var d = res.data || {};
+    setCamLamp(true);
+    showResult('camResult', 'ok', d.deja_active ? 'Surveillance déjà active' : 'Surveillance démarrée',
+      '<p>Chaque nouvelle activation par une application non déclarée produit une notification. ' +
+      'Une même session d\'utilisation n\'alerte qu\'une fois : sans cette mémoire, une visioconférence ' +
+      'd\'une heure produirait une alerte toutes les cinq secondes.</p>' +
+      kv([['Intervalle', esc((d.intervalle != null ? d.intervalle : 5) + ' s')]]));
+    toast('Caméra', 'Surveillance continue démarrée.', 'ok');
+    loadStatus(true);
+  });
+});
+
+$('btnCamWatchStop').addEventListener('click', function () {
+  call('camera_watch_stop', {}).then(function (res) {
+    if (!res.ok) { handleFail(res, 'camResult', 'Caméra'); return; }
+    setCamLamp(false);
+    showResult('camResult', 'warn', 'Surveillance arrêtée',
+      '<p>Les activations de la caméra et du microphone ne sont plus signalées.</p>');
+    toast('Caméra', 'Surveillance arrêtée.', 'warn');
+    loadStatus(true);
+  });
+});
+
+
+/* ══ CONNEXIONS SORTANTES ════════════════════════════════════════════════ */
+var NIVEAUX = {
+  a_examiner: { tone: 'danger', txt: 'à examiner', cls: ' is-hot' },
+  suspect:    { tone: 'warn',   txt: 'suspect',    cls: ' is-warm' },
+  normal:     { tone: 'info',   txt: 'normal',     cls: '' }
+};
+
+var netView = segGroup('netview');
+
+function netRow(c) {
+  var n = NIVEAUX[c.niveau] || NIVEAUX.normal;
+  var dest = (c.adresse_distante || '') + (c.port_distant != null ? ':' + c.port_distant : '');
+  var raisons = (c.raisons || []).join(' · ');
+  return '<div class="trow is-multi' + n.cls + '">' +
+    '<span class="chip" data-tone="' + n.tone + '">' + esc(n.txt) + '</span>' +
+    '<span class="tmain"><b>' + esc(c.processus || '?') + '</b><small title="' +
+      esc(c.chemin || '') + '">' + esc(c.chemin || '') + '</small></span>' +
+    '<span class="tsize">' + esc(dest) + '</span>' +
+    '<span class="treason">' + (raisons ? esc(raisons) : '<em>aucun signal — ' +
+      esc(c.nom_de_domaine || 'pas de nom de domaine connu') + '</em>') +
+    ' <em>· score ' + esc(c.score != null ? c.score : 0) + '</em></span>' +
+    '</div>';
+}
+
+function appRow(a) {
+  var n = NIVEAUX[a.niveau] || NIVEAUX.normal;
+  var raisons = (a.raisons || []).join(' · ');
+  return '<div class="trow is-multi' + n.cls + '">' +
+    '<span class="chip" data-tone="' + n.tone + '">' + esc(n.txt) + '</span>' +
+    '<span class="tmain"><b>' + esc(a.processus || '?') + '</b><small title="' +
+      esc(a.chemin || '') + '">' + esc(a.chemin || '') + '</small></span>' +
+    '<span class="tsize">' + num(a.connexions || 0) + ' conn.</span>' +
+    '<span class="treason">' + (raisons ? esc(raisons) : '<em>aucun signal</em>') +
+    ' <em>· ' + esc((a.destinations || []).slice(0, 4).join(', ')) +
+    ((a.destinations || []).length > 4 ? ' …' : '') + '</em></span>' +
+    '</div>';
+}
+
+$('btnNet').addEventListener('click', function () {
+  var parApp = netView.v === 'applications';
+  call(parApp ? 'network_apps' : 'network_connections', {}).then(function (res) {
+    if (!res.ok) {
+      handleFail(res, 'netResult', 'Connexions');
+      $('netTable').innerHTML = '<p class="empty">' + esc(res.reason || res.error || '') + '</p>';
+      return;
+    }
+    var d = res.data || {};
+    var liste = parApp ? (d.applications || []) : (d.connexions || []);
+    $('netTable').innerHTML = liste.length
+      ? scroller(liste.map(parApp ? appRow : netRow).join(''))
+      : '<p class="empty">Aucune connexion établie au moment du relevé.</p>';
+
+    var chauds = liste.filter(function (x) { return (x.niveau || '') === 'a_examiner'; }).length;
+    var tiedes = liste.filter(function (x) { return (x.niveau || '') === 'suspect'; }).length;
+    showResult('netResult', chauds ? 'danger' : (tiedes ? 'warn' : 'ok'),
+      chauds ? num(chauds) + ' connexion(s) à examiner'
+             : (tiedes ? num(tiedes) + ' connexion(s) suspecte(s)' : 'Aucun signal anormal'),
+      kv([[parApp ? 'Applications' : 'Connexions', num(d.total || liste.length)],
+          ['À examiner', num(chauds)],
+          ['Suspectes', num(tiedes)]]) +
+      '<p class="p-note">Aucun de ces signaux n\'est une preuve pris isolément : c\'est leur accumulation ' +
+      'sur une même connexion qui mérite un regard. Le blocage relève du pare-feu applicatif, pas de ce relevé.</p>');
+    logLine('Relevé des connexions : ' + num(liste.length) + ' entrée(s).', chauds ? 'danger' : 'ok');
+  });
+});
+
+
+/* ══ QUI ACCÈDE À CET ORDINATEUR ═════════════════════════════════════════ */
+var CONSTAT_NIVEAUX = {
+  important:   { tone: 'danger', txt: 'important',  cls: ' is-hot' },
+  a_verifier:  { tone: 'warn',   txt: 'à vérifier', cls: ' is-warm' },
+  information: { tone: 'info',   txt: 'information', cls: '' }
+};
+
+function renderIntrusion(d) {
+  var constats = d.constats || [];
+  $('intruTable').innerHTML = constats.length
+    ? scroller(constats.map(function (c) {
+        var n = CONSTAT_NIVEAUX[c.niveau] || CONSTAT_NIVEAUX.information;
+        return '<div class="trow is-multi is-desc' + n.cls + '">' +
+          '<span class="chip" data-tone="' + n.tone + '">' + esc(n.txt) + '</span>' +
+          '<span class="tmain"><b>' + esc(c.titre || '') + '</b><small>' + esc(c.categorie || '') + '</small></span>' +
+          '<span class="treason">' + esc(c.detail || '') + '</span></div>';
+      }).join(''))
+    : '<p class="empty">Aucun constat sur les sources qui ont répondu. Ce n\'est pas une garantie : ' +
+      'lisez ci-dessous quelles sources n\'ont pas pu être interrogées.</p>';
+
+  var manquantes = Object.keys(d.sources || {}).filter(function (k) {
+    return String(d.sources[k]) !== 'ok';
+  }).length;
+  showResult('intruResult',
+    d.importants ? 'danger' : (d.a_verifier || manquantes ? 'warn' : 'ok'),
+    d.importants ? num(d.importants) + ' constat(s) important(s)'
+                 : (d.a_verifier ? num(d.a_verifier) + ' constat(s) à vérifier' : 'Aucun constat marquant'),
+    kv([['Importants', num(d.importants || 0)],
+        ['À vérifier', num(d.a_verifier || 0)],
+        ['Total', num(constats.length)]]) +
+    sourcesBlock(d.sources, 'Sources du rapport') +
+    (d.avertissement ? '<p class="p-note">' + esc(d.avertissement) + '</p>' : ''));
+}
+
+$('btnIntru').addEventListener('click', function () {
+  var jours = Number($('intruDays').value) || 7;
+  call('intrusion_report', { jours: jours }).then(function (res) {
+    if (!res.ok) { handleFail(res, 'intruResult', 'Accès à la machine'); return; }
+    renderIntrusion(res.data || {});
+    logLine('Rapport d\'accès établi sur ' + num(jours) + ' jour(s).', 'ok');
+  });
+});
+
+/* ── Audit d'accès aux fichiers : la seule action destructive des modules V2 */
+$('btnAudit').addEventListener('click', function () {
+  var folders = splitPaths($('auditFolders').value || $('auditFolders').placeholder);
+  if (!folders.length) { toast('Audit', 'Indiquez au moins un dossier.', 'warn'); return; }
+  destructive({
+    action: 'intrusion_audit_enable',
+    body: { folders: folders },
+    title: 'Activer l\'audit d\'accès aux fichiers',
+    lead: 'La stratégie d\'audit du système et les règles d\'audit des dossiers listés seront modifiées. ' +
+          'Rien n\'a encore été touché.',
+    label: 'Audit des accès',
+    reversible: true,
+    unit: 'dossier',
+    countLabel: 'Dossiers tracés',
+    planTitle: 'Dossiers concernés',
+    execLabel: 'Activer l\'audit',
+    revNote: 'Réversible : la stratégie d\'audit et les règles posées se retirent par les mêmes outils ' +
+             '(auditpol, propriétés de sécurité du dossier). N\'enregistre RIEN du passé — seuls les accès ' +
+             'postérieurs à l\'activation seront tracés.',
+    resultId: 'auditResult',
+    onDone: function (d) {
+      var env = v2Result(d);
+      var r = env.data || {};
+      var traces = r.dossiers_traces || [];
+      var echecs = r.echecs || [];
+      showResult('auditResult', env.ok && traces.length ? 'ok' : 'warn',
+        env.ok && traces.length ? 'Audit activé sur ' + num(traces.length) + ' dossier(s)' : 'Audit non appliqué',
+        kv([['Dossiers tracés', num(traces.length)], ['Échecs', num(echecs.length)]]) +
+        (traces.length ? subTable('Tracés', traces.map(function (f) {
+          return '<div class="trow"><span class="chip" data-tone="ok">tracé</span>' +
+            '<span class="tmain"><b>' + esc(f) + '</b></span></div>';
+        })) : '') +
+        (echecs.length ? subTable('Refusés', echecs.map(function (f) {
+          return '<div class="trow is-warm"><span class="chip" data-tone="warn">refusé</span>' +
+            '<span class="tmain"><b>' + esc(f) + '</b><small>droits administrateur requis</small></span></div>';
+        })) : '') +
+        '<p class="p-note">' + esc(r.rappel || env.error ||
+          'Seuls les accès à partir de maintenant seront enregistrés.') + '</p>');
+    }
+  });
+});
+
+
+/* ══ HISTORIQUE UNIFIÉ ═══════════════════════════════════════════════════
+   La promesse « tout est réversible » rendue visible : une vue chronologique,
+   un bouton « annuler » par entrée, et les mécanismes en panne affichés.
+   ════════════════════════════════════════════════════════════════════════ */
+var histSrc = segGroup('histsrc', function () { loadHistory(); });
+
+function histRow(e) {
+  var quand = e.horodatage ? shortDate(e.horodatage) : 'date inconnue';
+  return '<div class="trow is-desc">' +
+    '<span class="chip" data-tone="' + (e.annulable ? 'brand' : 'info') + '">' + esc(srcLabel(e.source)) + '</span>' +
+    '<span class="tmain"><b>' + esc(e.description || e.type_action || '—') + '</b><small>' +
+      esc(e.type_action || '') + '</small></span>' +
+    '<span class="tstamp">' + esc(quand) + '</span>' +
+    '<span class="tact">' + (e.annulable
+      ? '<button class="btn btn-ghost btn-sm" data-undo="' + esc(e.id) + '">Annuler</button>'
+      : '<button class="btn btn-ghost btn-sm" disabled title="' +
+        esc(e.raison_non_annulable || 'action non annulable') + '">Non annulable</button>') +
+    '</span></div>';
+}
+
+function loadHistory() {
+  var filtre = histSrc.v || null;
+  return call('history_list', { limite: 100, filtre: filtre }).then(function (res) {
+    if (!res.ok) {
+      handleFail(res, 'histResult', 'Historique');
+      $('histTable').innerHTML = '<p class="empty">' + esc(res.reason || res.error || '') + '</p>';
+      return;
+    }
+    var d = res.data || {};
+    var entrees = d.entrees || [];
+    $('histTable').innerHTML = entrees.length
+      ? scroller(entrees.map(histRow).join(''))
+      : '<p class="empty">Aucune entrée pour ce filtre. Rien n\'a encore été mis de côté, isolé ou réorganisé.</p>';
+
+    var problemes = d.problemes || [];
+    showResult('histResult', problemes.length ? 'warn' : 'info',
+      num(d.total || entrees.length) + ' action(s) dans l\'historique',
+      kv([['Affichées', num(d.affichees || entrees.length)],
+          ['Annulables', num(d.annulables || 0)],
+          ['Total', num(d.total || entrees.length)],
+          ['Mécanismes en défaut', num(problemes.length)]]) +
+      problemsBlock(problemes));
+  });
+}
+
+$('btnHist').addEventListener('click', loadHistory);
+
+/* La vue chronologique se remplit d'elle-même à la première visite : un
+   historique qui exige un clic sur « Actualiser » pour montrer quoi que ce
+   soit ne rend pas la réversibilité visible. Lecture d'index locaux, aucun
+   appel système : le coût est négligeable. */
+var histCharge = false;
+
+function autoHistorique() {
+  if (histCharge) return;
+  if ((location.hash || '').replace(/^#\//, '') !== 'historique') return;
+  histCharge = true;
+  loadHistory();
+}
+
+window.addEventListener('hashchange', autoHistorique);
+autoHistorique();
+
+$('histTable').addEventListener('click', function (e) {
+  var b = e.target.closest('[data-undo]');
+  if (!b) return;
+  var row = b.closest('.trow');
+  var nom = row.querySelector('.tmain b').textContent;
+  b.disabled = true;
+  call('history_undo', { id: b.dataset.undo }).then(function (res) {
+    if (!res.ok) {
+      b.disabled = false;
+      handleFail(res, 'histResult', 'Annulation');
+      return;
+    }
+    row.classList.add('is-gone');
+    toast('Historique', 'Annulé : ' + nom, 'ok');
+    setTimeout(function () { loadHistory(); loadStatus(true); }, 520);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
    AMORÇAGE
    ══════════════════════════════════════════════════════════════════════════ */
 function boot() {
@@ -1881,6 +2546,11 @@ function boot() {
     toast('Jeton de session absent',
       'La page n\'a pas été servie par l\'outil : les actions seront refusées (403). Ouvrez l\'adresse affichée au démarrage.', 'danger');
   }
+  /* Premier appel, avant même l'état global : un mode incident resté actif
+     d'une session précédente doit être annoncé tout de suite. Un utilisateur
+     avec un réseau coupé sans savoir pourquoi est un échec grave. */
+  loadIncidentState(true);
+
   loadStatus(true).then(function () {
     if (SCENE) scene(SCENE);
   });
@@ -1888,11 +2558,71 @@ function boot() {
   setInterval(function () { if (!document.hidden) loadStatus(true); }, 45000);
 }
 
-/* Scènes de capture (?scene=...) : uniquement de l'affichage, aucune écriture. */
+/* Scènes de capture (?scene=...) : uniquement de l'affichage, aucune écriture.
+   Elles peignent les panneaux avec un jeu de données représentatif, pour
+   documenter et vérifier des situations qu'on ne peut pas provoquer sur la
+   machine de développement (Windows uniquement, ou infection en cours).
+   Aucun appel au backend, aucune donnée persistée. */
 function scene(name) {
   if (name === 'scan') {
     setScan('running', { progress: .62, done: 1284, total: 2071,
       current: 'C:\\Users\\Public\\Downloads\\pilote_imprimante_v4.exe', threats: 2 });
+  }
+
+  if (name === 'camera') {
+    renderCamera({
+      acces: [
+        { application: 'inconnu32.exe', appareil: 'webcam', appareil_lisible: 'caméra',
+          en_cours: true, autorisee: false, debut: '2026-08-20T14:31:12' },
+        { application: 'Teams.exe', appareil: 'microphone', appareil_lisible: 'microphone',
+          en_cours: true, autorisee: true, debut: '2026-08-20T14:02:40' },
+        { application: 'Camera.exe', appareil: 'webcam', appareil_lisible: 'caméra',
+          en_cours: false, autorisee: false, debut: '2026-08-19T09:12:03', fin: '2026-08-19T09:12:09' }
+      ],
+      en_cours: [{}, {}],
+      alertes: [{ application: 'inconnu32.exe', appareil: 'webcam', appareil_lisible: 'caméra',
+                  en_cours: true, autorisee: false, debut: '2026-08-20T14:31:12' }],
+      autorisees: ['Teams.exe'],
+      sources: { webcam: 'ok', microphone: 'ok' },
+      rappel: 'Sur la plupart des portables, la diode de la caméra est câblée sur l\'alimentation du ' +
+              'capteur : si elle s\'allume, la caméra filme, quel que soit ce qu\'affiche un logiciel.'
+    }, 'État actuel de la caméra et du microphone');
+  }
+
+  if (name === 'intrusion') {
+    renderIntrusion({
+      importants: 2, a_verifier: 2,
+      constats: [
+        { categorie: 'session', niveau: 'important', titre: 'Session Bureau à distance ouverte : ZEEV-ADMIN',
+          detail: 'Quelqu\'un est connecté à distance sur cette machine EN CE MOMENT. Si ce n\'est pas toi, ' +
+                  'c\'est le constat le plus urgent de ce rapport.' },
+        { categorie: 'compte', niveau: 'important', titre: 'Compte créé récemment : support_tech',
+          detail: 'La création d\'un compte est un moyen classique de garder un accès. Si tu ne l\'as pas créé, c\'est grave.' },
+        { categorie: 'logiciel', niveau: 'a_verifier', titre: 'Logiciel d\'accès à distance actif : AnyDesk',
+          detail: 'Ce logiciel est légitime, mais il permet à un tiers de prendre la main. L\'as-tu installé ' +
+                  'toi-même, et sais-tu pourquoi il tourne ?' },
+        { categorie: 'journal', niveau: 'a_verifier', titre: '48 échecs de connexion sur 7 jours',
+          detail: 'Un nombre élevé d\'échecs peut trahir des tentatives répétées de deviner un mot de passe.' },
+        { categorie: 'compte', niveau: 'information', titre: '3 comptes locaux actifs',
+          detail: 'Passe la liste en revue : un compte que tu ne reconnais pas mérite une explication.' }
+      ],
+      sources: { sessions: 'ok', logiciels: 'ok', connexions: 'ok',
+                 journal: 'droits insuffisants — relancer en administrateur',
+                 comptes: 'PowerShell indisponible (Windows uniquement)' },
+      avertissement: 'Ce rapport ne dit pas QUI, au sens d\'une personne : il donne un compte, une machine, ' +
+                     'une adresse. Et il ne dit pas quels documents ont été lus — Windows ne l\'enregistre ' +
+                     'pas par défaut.'
+    });
+  }
+
+  if (name === 'incident-actif') {
+    paintIncident({
+      actif: true, depuis: '2026-08-20T14:32:07', reseau_coupe: true, nb_geles: 2,
+      etape_atteinte: 'termine', regle: 'AZ_INCIDENT',
+      retrait_manuel: 'netsh advfirewall firewall delete rule name=AZ_INCIDENT',
+      message: 'MODE INCIDENT ACTIF depuis 2026-08-20T14:32:07 — réseau coupé (règle AZ_INCIDENT) ; ' +
+               '2 processus gelé(s) : facture.exe, runner.exe. Utilise « Rétablir » pour tout remettre en place.'
+    });
   }
 }
 

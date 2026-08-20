@@ -690,6 +690,131 @@ button,input,select{font:inherit;color:inherit}
 .trow .chip{flex:none;max-width:42%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .trow.is-head .tmain{font-size:10.5px}
 
+/* ══ V2 — SÉCURITÉ AVANCÉE ══════════════════════════════════════════════
+   Aucune couleur nouvelle : on réutilise les timbres d'état déjà posés
+   (danger cramoisi, avertissement jaune, ok menthe, info bleu froid).
+   ═══════════════════════════════════════════════════════════════════════ */
+.span-4{grid-column:span 4}
+
+/* ── Bouton d'urgence, dans la barre du haut ───────────────────────────── */
+/* Distinct de tout le reste : c'est le seul élément cramoisi permanent de
+   l'interface. Il n'agit pas au clic, il ouvre la modale de validation. */
+.btn-incident{
+  display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px;
+  border-radius:10px;cursor:pointer;font-size:12.5px;font-weight:700;letter-spacing:.02em;
+  color:#ffd9e2;background:linear-gradient(135deg,rgba(255,61,105,.30),rgba(255,61,105,.16));
+  border:1px solid var(--danger-line);transition:.2s var(--ease);white-space:nowrap;
+}
+.btn-incident .ic{width:16px;height:16px;color:var(--danger)}
+.btn-incident:hover{color:#fff;border-color:var(--danger);box-shadow:0 0 22px -4px rgba(255,61,105,.65)}
+.btn-incident:focus-visible{outline:2px solid var(--danger);outline-offset:2px}
+.btn-incident[data-actif="true"]{
+  color:#1a0308;background:linear-gradient(135deg,#ff6d8f,var(--danger));border-color:var(--danger);
+  animation:incPulse 2.4s ease-in-out infinite;
+}
+@keyframes incPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,61,105,.55)}50%{box-shadow:0 0 0 7px rgba(255,61,105,0)}}
+
+/* ── Bannière : mode incident resté actif ──────────────────────────────── */
+.incident-banner{
+  position:sticky;top:calc(var(--top-h) + 8px);z-index:60;
+  display:flex;align-items:center;gap:14px;margin-bottom:20px;
+  padding:14px 16px;border-radius:var(--r-m);
+  background:linear-gradient(180deg,rgba(255,61,105,.22),rgba(12,3,7,.94));
+  border:1px solid var(--danger);box-shadow:0 18px 46px -22px rgba(255,61,105,.75);
+  backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+}
+.ib-sig{
+  display:grid;place-items:center;width:38px;height:38px;flex:none;border-radius:11px;
+  background:var(--danger-dim);border:1px solid var(--danger-line);color:var(--danger);
+}
+.ib-sig .ic{width:20px;height:20px;stroke-width:1.8}
+.ib-txt{min-width:0;flex:1}
+.ib-txt b{display:block;font-size:14px;font-weight:700;color:#ffd0dc}
+.ib-txt p{font-size:12.5px;color:var(--tx-2);line-height:1.5;margin-top:3px;overflow-wrap:anywhere}
+.ib-act{display:flex;gap:8px;flex:none;flex-wrap:wrap}
+
+/* ── État du mode incident, dans son panneau ───────────────────────────── */
+.incstate{padding:14px 16px;border-radius:var(--r-m);background:rgba(0,0,0,.3);border:1px solid var(--line)}
+.incstate-l{font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--tx-4);font-weight:650}
+.incstate-v{display:block;font-size:18px;font-weight:650;color:var(--ok);margin-top:4px}
+.incstate-m{font-size:12.5px;color:var(--tx-2);line-height:1.55;margin-top:6px;overflow-wrap:anywhere}
+.incstate[data-actif="true"]{border-color:var(--danger-line);background:linear-gradient(180deg,var(--danger-dim),rgba(0,0,0,.3))}
+.incstate[data-actif="true"] .incstate-v{color:var(--danger)}
+.incstate[data-actif="warn"]{border-color:var(--warn-line);background:linear-gradient(180deg,var(--warn-dim),rgba(0,0,0,.3))}
+.incstate[data-actif="warn"] .incstate-v{color:var(--warn)}
+
+/* ── Encadré d'avertissement (ce que ça coûte) ─────────────────────────── */
+.warnbox{padding:13px 15px;border-radius:var(--r-m);background:var(--warn-dim);border:1px solid var(--warn-line)}
+.warnbox-h{font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--warn);font-weight:700}
+.warnbox ul{margin:8px 0 0;padding-left:17px;display:flex;flex-direction:column;gap:5px}
+.warnbox li{font-size:12.5px;color:var(--tx-2);line-height:1.5}
+.warnbox li::marker{color:var(--warn)}
+
+/* ── Alarme : accès caméra ou micro non autorisé, EN COURS ─────────────── */
+.alarm{
+  padding:15px 16px;border-radius:var(--r-m);
+  background:linear-gradient(180deg,rgba(255,61,105,.24),rgba(10,3,6,.9));
+  border:1px solid var(--danger);box-shadow:0 0 34px -12px rgba(255,61,105,.8);
+  animation:alarmPulse 2s ease-in-out infinite;
+}
+@keyframes alarmPulse{0%,100%{border-color:var(--danger)}50%{border-color:rgba(255,61,105,.35)}}
+.alarm-h{display:flex;align-items:center;gap:10px;color:var(--danger);font-weight:700;font-size:14.5px}
+.alarm-h .ic{width:19px;height:19px;flex:none;stroke-width:1.9}
+.alarm-l{margin-top:11px;display:flex;flex-direction:column;gap:8px}
+.alarm-i{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:10px 12px;border-radius:10px;background:rgba(0,0,0,.42);border:1px solid var(--danger-line);
+}
+.alarm-i b{font-size:13px;color:#ffd0dc}
+.alarm-i small{font-family:var(--mono);font-size:11px;color:var(--tx-3);overflow-wrap:anywhere}
+.alarm-i .tact{margin-left:auto}
+.alarm-n{font-size:12.5px;color:var(--tx-2);line-height:1.55;margin-top:10px}
+
+/* ── Sources d'un rapport : ce qui a répondu, ce qui manque ─────────────
+   Point non négociable : un rapport partiel présenté comme complet est pire
+   qu'un rapport absent. Les sources muettes sont donc TOUJOURS affichées. */
+.srcs{border-radius:var(--r-m);border:1px solid var(--line);background:rgba(0,0,0,.3);overflow:hidden}
+.srcs-h{
+  padding:9px 13px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--tx-3);font-weight:650;background:rgba(0,0,0,.3);border-bottom:1px solid var(--line);
+}
+.srcs-h.is-partial{color:var(--warn)}
+.src{display:flex;align-items:center;gap:10px;padding:9px 13px;border-bottom:1px solid rgba(255,214,170,.05);flex-wrap:wrap}
+.src:last-child{border-bottom:0}
+.src .ic{width:14px;height:14px;flex:none;color:var(--ok)}
+.src.is-off .ic{color:var(--warn)}
+.src-n{font-size:12.5px;font-weight:600;color:var(--tx-1);flex:none;min-width:118px}
+.src-v{font-size:12px;color:var(--tx-3);flex:1;min-width:0;line-height:1.45;overflow-wrap:anywhere}
+.src.is-off .src-v{color:var(--warn)}
+
+/* ── Modale de confirmation : rien ne doit être coupé ──────────────────
+   `.sheet-body` est une colonne flex : ses enfants se comprimaient quand la
+   fenêtre était trop courte, et `overflow:hidden` coupait le plan au milieu
+   d'une ligne — sur un écran étroit, les étapes 2 à 4 du Mode Incident
+   devenaient inatteignables. Les blocs gardent donc leur hauteur, et c'est
+   le corps de la modale qui défile. */
+.sheet-body > *{flex:0 0 auto}
+.sheet-steps{max-height:210px;overflow-y:auto}
+
+/* ── Lignes de constat / de connexion : la raison, pas seulement le score ─
+   `.trow` ne passe pas à la ligne par défaut : sans `is-multi`, la raison
+   (base 100 %) écrasait le titre à zéro pixel — c'est ce qui avait fait
+   disparaître les noms de processus du relevé réseau. */
+.trow.is-multi{flex-wrap:wrap;row-gap:5px}
+/* Titres qui sont des PHRASES (constats, descriptions d'historique, étapes)
+   et non des chemins : ils s'enroulent au lieu d'être coupés — une phrase
+   tronquée perd son sens, un chemin tronqué reste reconnaissable. */
+.trow.is-desc .tmain b{white-space:normal;overflow:visible;text-overflow:clip}
+.trow.is-multi .tmain{flex:1 1 auto;min-width:180px}
+.tact .chip{max-width:none}
+.treason{flex:1 1 100%;font-size:12px;color:var(--tx-2);line-height:1.5;padding-top:2px;overflow-wrap:anywhere}
+.treason em{font-style:normal;color:var(--tx-3)}
+.trow.is-hot{background:linear-gradient(90deg,var(--danger-dim),transparent 62%)}
+.trow.is-warm{background:linear-gradient(90deg,var(--warn-dim),transparent 62%)}
+.trow.is-hot:hover{background:linear-gradient(90deg,rgba(255,61,105,.22),transparent 62%)}
+.trow.is-warm:hover{background:linear-gradient(90deg,rgba(255,217,77,.20),transparent 62%)}
+.tstamp{font-size:11px;color:var(--tx-4);font-family:var(--mono);flex:none}
+
 /* ══ Défilement ═════════════════════════════════════════════════════════ */
 ::-webkit-scrollbar{width:9px;height:9px}
 ::-webkit-scrollbar-track{background:transparent}
@@ -701,13 +826,13 @@ button,input,select{font:inherit;color:inherit}
   .deck{grid-template-columns:repeat(3,minmax(0,1fr))}
   .deck-dash .panel-hero{grid-column:span 3}
   .panel-log{grid-column:span 3}
-  .span-2{grid-column:span 3}
+  .span-2,.span-4{grid-column:span 3}
 }
 @media (max-width:1100px){
   .deck{grid-template-columns:repeat(2,minmax(0,1fr))}
   .deck-dash .panel-hero{grid-column:span 2}
   .panel-log{grid-column:span 2}
-  .span-2{grid-column:span 2}
+  .span-2,.span-4{grid-column:span 2}
   .hero-grid{grid-template-columns:1fr;gap:24px;text-align:center;padding:26px 22px}
   /* En colonne, la légende « indice de protection » (positionnée sous le
      disque) doit garder sa place, sinon elle chevauche le titre suivant. */
@@ -728,7 +853,12 @@ button,input,select{font:inherit;color:inherit}
   }
   .rail.is-open{transform:none}
   .deck{grid-template-columns:1fr}
-  .deck-dash .panel-hero,.panel-log,.span-2{grid-column:span 1}
+  .deck-dash .panel-hero,.panel-log,.span-2,.span-4{grid-column:span 1}
+  /* La bannière d'incident passe en colonne : les boutons de rétablissement
+     doivent rester atteignables sans défilement horizontal. */
+  .incident-banner{flex-wrap:wrap}
+  .ib-act{width:100%}
+  .ib-act .btn{flex:1 1 auto}
   .scanhud{grid-template-columns:1fr;gap:20px}
   .scanhud-vis{width:186px;height:186px}
   .scanhud-vis .bh-md{width:176px;height:176px}
@@ -778,6 +908,17 @@ button,input,select{font:inherit;color:inherit}
   .seg{width:100%}
   .seg-i{flex:1 1 auto;text-align:center}
   .sheet-plan-l li{flex-wrap:wrap}
+  /* Barre du haut très étroite : le bouton d'urgence garde sa place mais
+     perd son libellé — l'icône sirène et sa couleur suffisent à l'identifier,
+     le nom reste dans l'infobulle et dans aria-label. */
+  .btn-incident{padding:0 10px;gap:0}
+  .btn-incident .bi-txt{display:none}
+  .srcs-h,.src{padding-left:11px;padding-right:11px}
+  .src-n{min-width:0;flex:1 1 100%}
+  .alarm-i .tact{margin-left:0;width:100%}
+  .alarm-i .tact .btn{flex:1}
+  .warnbox li{font-size:12px}
+  .incstate-v{font-size:16px}
 }
 
 /* ══ Mouvement réduit ═══════════════════════════════════════════════════ */
@@ -790,4 +931,9 @@ button,input,select{font:inherit;color:inherit}
   .bh.is-active .bh-orbit-b{opacity:.6}
   .infall{display:none}
   .bar > i::after{display:none}
+  /* Les deux signaux d'urgence perdent leur pulsation mais gardent leur
+     contraste : l'information passe par la couleur et le cadre, jamais par
+     le seul mouvement. */
+  .btn-incident[data-actif="true"]{animation:none;box-shadow:0 0 0 3px rgba(255,61,105,.35)}
+  .alarm{animation:none;border-color:var(--danger)}
 }

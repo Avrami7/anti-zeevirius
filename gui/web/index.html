@@ -93,6 +93,12 @@
   <symbol id="i-close" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
   <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h13M13 6.6l5.4 5.4-5.4 5.4"/></symbol>
 
+  <!-- ══ V2 : sécurité avancée ══ -->
+  <symbol id="i-siren" viewBox="0 0 24 24"><path d="M6.5 19v-5.6a5.5 5.5 0 0 1 11 0V19"/><path d="M4.2 19h15.6"/><path d="M12 3v2M5.6 5.6l1.4 1.4M18.4 5.6L17 7"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24"><rect x="2.6" y="7.4" width="12.6" height="9.2" rx="1.8"/><path d="M15.2 11.3l5.2-2.7v6.8l-5.2-2.7z"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M3.6 9.6h16.8M3.6 14.4h16.8"/><path d="M12 3.4c2.3 2.4 3.5 5.3 3.5 8.6S14.3 18.2 12 20.6C9.7 18.2 8.5 15.3 8.5 12S9.7 5.8 12 3.4z"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.3" r="3.6"/><path d="M4.9 20.1a7.1 7.1 0 0 1 14.2 0"/></symbol>
+
   <!-- ══ La marque : trou noir et son disque d'accrétion ══ -->
   <symbol id="blackhole" viewBox="0 0 240 240">
     <g class="bh-halo"><circle cx="120" cy="120" r="118" fill="url(#bhHalo)"/></g>
@@ -139,6 +145,13 @@
   </div>
 
   <div class="topbar-end">
+    <!-- Bouton d'urgence : visible depuis tous les panneaux, jamais enterré
+         dans un sous-menu. Il n'agit pas au clic — il ouvre la modale de
+         validation, qui affiche le plan exact avant toute coupure. -->
+    <button class="btn-incident" id="btnIncident" type="button"
+            title="Mode Incident — coupe le réseau, gèle les processus suspects, sauvegarde. Réversible.">
+      <svg class="ic"><use href="#i-siren"/></svg><span class="bi-txt">Mode Incident</span>
+    </button>
     <span class="clock" id="clock" aria-label="Heure locale">--:--:--</span>
     <button class="icon-btn" id="btnRefresh" type="button" title="Rafraîchir l'état" aria-label="Rafraîchir l'état">
       <svg viewBox="0 0 24 24" class="ic"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4.2v4.2h-4.2"/></svg>
@@ -153,10 +166,12 @@
   <div class="rail-grp">
     <p class="rail-lbl">Supervision</p>
     <a class="rail-i" href="#/tableau-de-bord" data-view="tableau-de-bord"><svg class="ic"><use href="#i-gauge"/></svg><span>Tableau de bord</span></a>
+    <a class="rail-i" href="#/historique" data-view="historique"><svg class="ic"><use href="#i-undo"/></svg><span>Historique</span><em class="rail-n">1</em></a>
   </div>
   <div class="rail-grp">
     <p class="rail-lbl">Opérations</p>
     <a class="rail-i" href="#/protection" data-view="protection"><svg class="ic"><use href="#i-shield"/></svg><span>Protection</span><em class="rail-n">7</em></a>
+    <a class="rail-i" href="#/securite" data-view="securite"><svg class="ic"><use href="#i-siren"/></svg><span>Sécurité avancée</span><em class="rail-n">5</em></a>
     <a class="rail-i" href="#/nettoyage" data-view="nettoyage"><svg class="ic"><use href="#i-broom"/></svg><span>Nettoyage</span><em class="rail-n">4</em></a>
     <a class="rail-i" href="#/rangement" data-view="rangement"><svg class="ic"><use href="#i-tree"/></svg><span>Rangement</span><em class="rail-n">6</em></a>
     <a class="rail-i" href="#/systeme" data-view="systeme"><svg class="ic"><use href="#i-cpu"/></svg><span>Système</span><em class="rail-n">4</em></a>
@@ -170,6 +185,21 @@
 </nav>
 
 <main class="stage" id="stage">
+
+  <!-- ══ Bannière d'incident : un réseau coupé sans explication est un échec
+       grave. Elle est collante (sticky) : elle suit la lecture au lieu de
+       disparaître au premier défilement. ══ -->
+  <div class="incident-banner" id="incidentBanner" role="alert" hidden>
+    <span class="ib-sig"><svg class="ic"><use href="#i-siren"/></svg></span>
+    <div class="ib-txt">
+      <b id="incidentBannerTitle">Mode Incident actif</b>
+      <p id="incidentBannerMsg">—</p>
+    </div>
+    <div class="ib-act">
+      <button class="btn btn-primary btn-sm" type="button" id="btnIncidentRestoreTop">Rétablir maintenant</button>
+      <button class="btn btn-ghost btn-sm" type="button" data-goto="#/securite" data-focus="pIncident">Voir le détail</button>
+    </div>
+  </div>
 
   <!-- ═══════════════ TABLEAU DE BORD ═══════════════ -->
   <section class="view" id="view-tableau-de-bord" data-view="tableau-de-bord">
@@ -392,6 +422,192 @@
             </div>
           </div>
           <div class="result" id="phResult" hidden></div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ═══════════════ SÉCURITÉ AVANCÉE ═══════════════ -->
+  <section class="view" id="view-securite" data-view="securite" hidden>
+    <div class="view-head">
+      <h1>Sécurité avancée</h1>
+      <p>Mode Incident, caméra et microphone, connexions sortantes, accès à cette machine.</p>
+    </div>
+
+    <div class="deck">
+      <article class="panel span-4 panel-incident" id="pIncident" data-mod="incident_mode">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-siren"/></svg> Mode Incident</h3>
+          <span class="tag tag-danger">Urgence — réversible</span>
+        </header>
+        <div class="p-body">
+          <div class="incstate" id="incState" data-actif="false">
+            <span class="incstate-l">État</span>
+            <b class="incstate-v" id="incStateVal">Lecture de l'état…</b>
+            <p class="incstate-m" id="incStateMsg">—</p>
+          </div>
+
+          <p class="p-note">Tu penses être infecté <b>maintenant</b> : un seul geste coupe la propagation
+            et préserve les preuves. En quelques secondes : réseau coupé (règle de pare-feu, pas la carte
+            réseau), processus suspects <b>gelés — jamais arrêtés</b>, sauvegarde par cliché instantané,
+            rapport horodaté. La sortie du mode tient en un clic.</p>
+
+          <div class="btn-row">
+            <button class="btn btn-danger" type="button" id="btnIncidentGo">
+              <svg class="ic"><use href="#i-siren"/></svg> Déclencher le Mode Incident
+            </button>
+            <button class="btn btn-ghost" type="button" id="btnIncidentPlan">Voir le plan sans rien engager</button>
+            <button class="btn btn-primary" type="button" id="btnIncidentRestore">
+              <svg class="ic"><use href="#i-undo"/></svg> Rétablir
+            </button>
+          </div>
+
+          <div class="warnbox">
+            <p class="warnbox-h">Ce que ça coûte</p>
+            <ul>
+              <li>Coupure réseau immédiate : travail en ligne non enregistré perdu, appels coupés, téléchargements interrompus.</li>
+              <li>Un processus légitime gelé peut perdre ses données non enregistrées.</li>
+              <li>Un chiffrement déjà terminé ne sera pas annulé : ce mode limite les dégâts, il ne les répare pas.</li>
+              <li>Droits administrateur exigés pour le pare-feu et les clichés VSS ; un logiciel plus privilégié que l'outil peut résister au gel.</li>
+              <li><b>Ne redémarre pas</b> : pour plusieurs familles de rançongiciels, la clé de chiffrement est encore en mémoire vive tant que la machine reste allumée.</li>
+            </ul>
+          </div>
+
+          <div class="result" id="incResult" hidden></div>
+        </div>
+      </article>
+
+      <article class="panel span-2" id="pCamera" data-mod="camera_watch">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-cam"/></svg> Caméra et microphone</h3>
+          <span class="statelamp" id="camLamp" data-on="false" title="Surveillance continue"></span>
+        </header>
+        <div class="p-body">
+          <div class="btn-row">
+            <button class="btn btn-primary" type="button" id="btnCamState">État actuel</button>
+            <button class="btn btn-ghost" type="button" id="btnCamRecent">Utilisations récentes</button>
+            <label class="lbl-inline" for="camHours">sur</label>
+            <input class="inp inp-num inp-xs" id="camHours" type="number" min="1" max="720" value="24">
+            <span class="lbl-inline">heures</span>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-ghost" type="button" id="btnCamWatch">Surveiller en continu</button>
+            <button class="btn btn-ghost" type="button" id="btnCamWatchStop">Arrêter la surveillance</button>
+          </div>
+
+          <div class="alarm" id="camAlarm" hidden></div>
+
+          <div class="tbl" id="camTable"><p class="empty">Aucun relevé chargé.</p></div>
+
+          <div class="field">
+            <label class="lbl" for="camApp">Déclarer une application légitime</label>
+            <div class="field-row">
+              <input class="inp" id="camApp" type="text" placeholder="Teams.exe" spellcheck="false" autocomplete="off">
+              <button class="btn btn-primary" type="button" id="btnCamAllow">Autoriser</button>
+            </div>
+            <p class="p-note">Une application autorisée ne déclenche plus d'alerte. L'explication la plus
+              fréquente n'est pas un espion : c'est une visioconférence laissée ouverte en arrière-plan.</p>
+          </div>
+          <div class="tbl" id="camAllowed"><p class="empty">Aucune application déclarée.</p></div>
+
+          <p class="p-note">Sur la plupart des portables, la diode de la caméra est câblée sur l'alimentation
+            du capteur : si elle s'allume, la caméra filme, quel que soit ce qu'affiche un logiciel. C'est le
+            témoin le plus fiable — plus que ce module, qui identifie l'<b>application</b>, jamais la personne,
+            et ne voit pas un pilote qui parlerait directement au matériel.</p>
+
+          <div class="result" id="camResult" hidden></div>
+        </div>
+      </article>
+
+      <article class="panel span-2" id="pNetwork" data-mod="network_watch">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-globe"/></svg> Connexions sortantes</h3>
+          <span class="p-hint">Triées par niveau de suspicion</span>
+        </header>
+        <div class="p-body">
+          <div class="seg" role="tablist" aria-label="Vue des connexions">
+            <button class="seg-i is-on" type="button" data-netview="connexions" role="tab" aria-selected="true">Par connexion</button>
+            <button class="seg-i" type="button" data-netview="applications" role="tab" aria-selected="false">Par application</button>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" type="button" id="btnNet">Relever les connexions</button>
+          </div>
+          <div class="tbl" id="netTable"><p class="empty">Aucun relevé.</p></div>
+          <p class="p-note">Lecture des tables de connexion, sans interception : on voit <b>qui parle à qui</b>,
+            jamais ce qui est dit. Le trafic chiffré reste chiffré, et une connexion très brève entre deux
+            relevés passe inaperçue — c'est une photographie, pas un film. Une adresse à l'étranger n'est pas
+            une preuve : c'est l'accumulation de signaux sur une même connexion qui mérite un regard.</p>
+          <div class="result" id="netResult" hidden></div>
+        </div>
+      </article>
+
+      <article class="panel span-2" id="pIntrusion" data-mod="intrusion_check">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-user"/></svg> Qui accède à cet ordinateur</h3>
+          <span class="p-hint">Sessions, logiciels d'accès distant, journal de sécurité</span>
+        </header>
+        <div class="p-body">
+          <div class="btn-row">
+            <label class="lbl-inline" for="intruDays">Fenêtre d'examen</label>
+            <input class="inp inp-num inp-xs" id="intruDays" type="number" min="1" max="365" value="7">
+            <span class="lbl-inline">jours</span>
+            <button class="btn btn-primary" type="button" id="btnIntru">Établir le rapport</button>
+          </div>
+          <div class="tbl" id="intruTable"><p class="empty">Aucun rapport établi.</p></div>
+          <div class="result" id="intruResult" hidden></div>
+        </div>
+      </article>
+
+      <article class="panel span-2" id="pAudit" data-mod="intrusion_check">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-eye"/></svg> Tracer les accès futurs aux documents</h3>
+          <span class="tag tag-danger">Modifie le système</span>
+        </header>
+        <div class="p-body">
+          <p class="p-note">Sous Windows, lire un fichier ne laisse par défaut <b>aucune trace</b> : l'audit
+            d'accès aux objets est désactivé d'origine. Une consultation passée n'a jamais été enregistrée,
+            elle est donc irrécupérable. On ne peut que commencer à l'enregistrer <b>pour l'avenir</b>.</p>
+          <div class="field">
+            <label class="lbl" for="auditFolders">Dossiers à tracer</label>
+            <input class="inp" id="auditFolders" type="text" placeholder="C:\Users\Public\Documents, C:\Users\Public\Desktop" spellcheck="false" autocomplete="off">
+            <p class="p-note">Séparez les chemins par une virgule.</p>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" type="button" id="btnAudit">Calculer le plan d'activation</button>
+          </div>
+          <div class="result" id="auditResult" hidden></div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ═══════════════ HISTORIQUE UNIFIÉ ═══════════════ -->
+  <section class="view" id="view-historique" data-view="historique" hidden>
+    <div class="view-head">
+      <h1>Historique</h1>
+      <p>Tout ce que l'outil a fait, dans l'ordre, avec un bouton « annuler » par entrée.</p>
+    </div>
+
+    <div class="deck">
+      <article class="panel span-4" id="pHistory" data-mod="history">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-undo"/></svg> Historique unifié</h3>
+          <button class="linkbtn" type="button" id="btnHist">Actualiser</button>
+        </header>
+        <div class="p-body">
+          <div class="seg" role="tablist" aria-label="Filtre par source">
+            <button class="seg-i is-on" type="button" data-histsrc="" role="tab" aria-selected="true">Tout</button>
+            <button class="seg-i" type="button" data-histsrc="quarantaine" role="tab" aria-selected="false">Quarantaine</button>
+            <button class="seg-i" type="button" data-histsrc="sas" role="tab" aria-selected="false">Sas de tri</button>
+            <button class="seg-i" type="button" data-histsrc="rangement" role="tab" aria-selected="false">Rangement</button>
+            <button class="seg-i" type="button" data-histsrc="demarrage" role="tab" aria-selected="false">Démarrage</button>
+            <button class="seg-i" type="button" data-histsrc="journal" role="tab" aria-selected="false">Journal V2</button>
+          </div>
+          <div class="tbl" id="histTable"><p class="empty">Aucune entrée chargée.</p></div>
+          <p class="p-note">Les quatre mécanismes de réversibilité du produit — quarantaine, sas de tri,
+            sessions de réorganisation, sauvegardes de démarrage — sont réunis ici. L'annulation est déléguée
+            au module d'origine, qui relit son état juste avant d'agir.</p>
+          <div class="result" id="histResult" hidden></div>
         </div>
       </article>
     </div>

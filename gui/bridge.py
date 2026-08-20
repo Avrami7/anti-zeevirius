@@ -184,6 +184,18 @@ _MODULE_SPECS: Dict[str, Tuple[str, str, Optional[str], str]] = {
     "reputation_checker": ("optimizer.reputation_checker", "ReputationChecker",
                            "REQUESTS_AVAILABLE", "module `requests` non installé"),
     "phishing_checker": ("optimizer.phishing_link_checker", "PhishingLinkChecker", None, ""),
+    # ── V2 : sécurité avancée et confort ──────────────────────────
+    # Ces modules assurent EUX-MÊMES leur dégradation propre : ils répondent
+    # `unavailable` quand PowerShell, quser ou le registre manquent, et
+    # continuent de rendre ce qu'ils ont pu collecter. Aucun drapeau n'est donc
+    # exigé ici, sauf pour network_watch dont l'inventaire est strictement
+    # impossible sans psutil.
+    "network_watch":    ("security.network_watch", "NetworkWatch",
+                         "PSUTIL_AVAILABLE", "psutil absent — inventaire des connexions impossible"),
+    "intrusion_check":  ("security.intrusion_check", "IntrusionCheck", None, ""),
+    "camera_watch":     ("security.camera_watch", "CameraWatch", None, ""),
+    "incident_mode":    ("security.incident_mode", "IncidentMode", None, ""),
+    "history":          ("comfort.history", "HistoriqueUnifie", None, ""),
 }
 
 # Actions qui n'ont de sens que sous Windows (outils système externes).
@@ -419,6 +431,29 @@ class Bridge:
         except (ModuleUnavailable, Exception):
             vt_configured = False
 
+        # Mode incident : relu à chaque rafraîchissement d'état (lecture d'un
+        # fichier JSON, aucun appel système). Un mode resté actif d'une session
+        # précédente doit être visible partout dans l'interface, tout le temps.
+        incident: Dict = {"actif": False, "message": "", "corrompu": False}
+        try:
+            etat_incident = self._need("incident_mode").etat()
+            incident = {
+                "actif": bool(etat_incident.get("actif")),
+                "depuis": etat_incident.get("depuis"),
+                "reseau_coupe": bool(etat_incident.get("reseau_coupe")),
+                "nb_geles": etat_incident.get("nb_geles", 0),
+                "corrompu": bool(etat_incident.get("corrompu")),
+                "message": etat_incident.get("message", ""),
+            }
+        except (ModuleUnavailable, Exception):
+            pass
+
+        camera_active = False
+        try:
+            camera_active = bool(self._need("camera_watch").surveillance_active)
+        except (ModuleUnavailable, Exception):
+            camera_active = False
+
         return ok({
             "platform": platform.system(),
             "is_admin": self._is_admin(),
@@ -436,6 +471,8 @@ class Bridge:
             "yara_engine": self._flag("yara_scanner", "YARA_AVAILABLE"),
             "psutil": self._flag("ransomware_shield", "PSUTIL_AVAILABLE"),
             "pending_confirmations": self.confirm.pending_count(),
+            "incident": incident,
+            "camera_watch_active": camera_active,
         })
 
     @staticmethod
@@ -985,6 +1022,237 @@ class Bridge:
             return {"results": results}
 
         return self._guarded("residue_clean", params, plan, execute)
+
+    # ═════════════════════════════════════════════════════════════
+    #  V2 — SÉCURITÉ AVANCÉE ET HISTORIQUE UNIFIÉ
+    #
+    #  Les cinq modules V2 rendent DÉJÀ l'enveloppe du contrat. Le pont ne
+    #  les ré-emballe pas et ne réinterprète aucun champ : il se contente de
+    #  les router, et d'imposer la double validation là où elle s'impose.
+    # ═════════════════════════════════════════════════════════════
+
+    @staticmethod
+    def _v2(res: Any) -> Dict:
+        """Transmet la réponse d'un module V2 sans la réécrire.
+
+        Deux formes coexistent dans les modules livrés, et une seule doit
+        sortir d'ici — sinon le frontend devrait connaître deux protocoles :
+
+        * `network_watch`, `camera_watch`, `intrusion_check`, `history`
+          rendent `{"ok": true, "data": {...}}` : c'est exactement le contrat,
+          transmis **tel quel**, sans copie ni filtrage.
+        * `incident_mode` rend `{"ok": true, <champs métier à plat>}`. Les
+          champs sont alors déplacés sous `data`, **sans être renommés, ni
+          filtrés, ni complétés**. Aucune information n'est perdue.
+
+        En échec, `error` est garanti non vide (le contrat en fait un message
+        lisible) : certains modules ne renseignent que `message` ou `reason`.
+        Les autres champs de l'échec sont conservés sous `data`, car ils
+        portent l'essentiel — le rétablissement partiel du mode incident dit
+        précisément CE QUI RESTE en place.
+        """
+        if not isinstance(res, dict) or "ok" not in res:
+            return err("réponse invalide d'un module de sécurité (enveloppe absente)")
+
+        if res.get("ok"):
+            if "data" in res:
+                return res
+            return ok({k: v for k, v in res.items() if k != "ok"})
+
+        indisponible = bool(res.get("unavailable"))
+        motif = (res.get("error") or res.get("reason") or res.get("message")
+                 or "action refusée par le module")
+        sortie: Dict = {"ok": False, "unavailable": indisponible, "error": str(motif)}
+        if indisponible:
+            sortie["reason"] = str(motif)
+        reste = {k: v for k, v in res.items()
+                 if k not in ("ok", "error", "reason", "unavailable", "data")}
+        if isinstance(res.get("data"), dict):
+            reste.update(res["data"])
+        if reste:
+            sortie["data"] = reste
+        return sortie
+
+    # ── Connexions réseau (lecture seule) ────────────────────────
+    def a_network_connections(self, params: Dict) -> Dict:
+        return self._v2(self._need("network_watch").lister_connexions())
+
+    def a_network_apps(self, params: Dict) -> Dict:
+        return self._v2(self._need("network_watch").resumer_par_application())
+
+    # ── Qui accède à cet ordinateur ──────────────────────────────
+    def a_intrusion_report(self, params: Dict) -> Dict:
+        jours = params.get("jours", params.get("days", 7))
+        try:
+            jours = max(1, min(365, int(jours)))
+        except (TypeError, ValueError):
+            jours = 7
+        return self._v2(self._need("intrusion_check").rapport(jours))
+
+    def a_intrusion_audit_enable(self, params: Dict) -> Dict:
+        """Active l'audit d'accès aux fichiers : la seule action destructive
+        des modules V2 — elle modifie une stratégie système et les ACL des
+        dossiers. Double validation obligatoire."""
+        checker = self._need("intrusion_check")
+        folders = self._folder_list(params.get("folders") or params.get("dossiers"))
+        if not folders:
+            return err("Aucun dossier valide fourni (chemins existants attendus).")
+
+        def plan():
+            prepare = checker.preparer_audit_fichiers(folders)
+            if not prepare.get("ok"):
+                # Le module refuse : le plan porte le refus, la modale
+                # l'affichera au lieu de laisser croire à une opération prête.
+                return {"erreur": prepare.get("error") or prepare.get("reason"),
+                        "items": [], "count": 0}
+            donnees = dict(prepare.get("data") or {})
+            # Clés de PRÉSENTATION ajoutées à côté du plan du module, jamais à
+            # la place : `items`/`count`/`steps`/`note` sont ce que sait lire
+            # la modale de confirmation (normalizePlan côté interface).
+            donnees["items"] = [{"path": d} for d in donnees.get("dossiers", [])]
+            donnees["count"] = len(donnees.get("dossiers", []))
+            donnees["steps"] = list(donnees.get("etapes", []))
+            donnees["note"] = " ".join(donnees.get("avertissements", []))
+            return donnees
+
+        def execute():
+            prepare = checker.preparer_audit_fichiers(folders)
+            if not prepare.get("ok"):
+                return prepare
+            return checker.activer_audit_fichiers(prepare.get("data") or {})
+
+        return self._guarded("intrusion_audit_enable", params, plan, execute)
+
+    # ── Caméra et microphone ─────────────────────────────────────
+    def a_camera_state(self, params: Dict) -> Dict:
+        watcher = self._need("camera_watch")
+        res = self._v2(watcher.etat())
+        if res.get("ok") and isinstance(res.get("data"), dict):
+            res["data"]["surveillance_active"] = bool(watcher.surveillance_active)
+        return res
+
+    def a_camera_recent(self, params: Dict) -> Dict:
+        heures = params.get("heures", params.get("hours", 24))
+        try:
+            heures = max(1, min(24 * 30, int(heures)))
+        except (TypeError, ValueError):
+            heures = 24
+        return self._v2(self._need("camera_watch").utilisations_recentes(heures))
+
+    def a_camera_allow(self, params: Dict) -> Dict:
+        app = str(self._require(params, "app")).strip()
+        return self._v2(self._need("camera_watch").autoriser(app))
+
+    def a_camera_revoke(self, params: Dict) -> Dict:
+        app = str(self._require(params, "app")).strip()
+        return self._v2(self._need("camera_watch").retirer_autorisation(app))
+
+    def a_camera_watch_start(self, params: Dict) -> Dict:
+        watcher = self._need("camera_watch")
+        res = self._v2(watcher.surveiller())
+        if res.get("ok") and isinstance(res.get("data"), dict):
+            res["data"]["surveillance_active"] = bool(watcher.surveillance_active)
+        return res
+
+    def a_camera_watch_stop(self, params: Dict) -> Dict:
+        watcher = self._need("camera_watch")
+        res = self._v2(watcher.arreter())
+        if res.get("ok") and isinstance(res.get("data"), dict):
+            res["data"]["surveillance_active"] = bool(watcher.surveillance_active)
+        return res
+
+    # ── Mode Incident ────────────────────────────────────────────
+    def a_incident_state(self, params: Dict) -> Dict:
+        """Lu au démarrage de l'interface : un mode incident resté actif d'une
+        session précédente doit être annoncé immédiatement."""
+        return self._v2(self._need("incident_mode").etat())
+
+    def a_incident_plan(self, params: Dict) -> Dict:
+        """Plan complet, lecture seule (une seule commande, `netsh show`)."""
+        return self._v2(self._need("incident_mode").preparer())
+
+    def a_incident_activate(self, params: Dict) -> Dict:
+        """Coupe le réseau, gèle les processus suspects, sauvegarde, rapporte.
+
+        Le mode incident n'est PAS destructif au sens du contrat — tout est
+        réversible d'un clic. Il passe malgré tout par `_guarded()` : couper
+        le réseau d'une machine est assez brutal pour mériter le plan affiché
+        et l'accusé de lecture, et cela évite un second mécanisme de
+        confirmation dans l'interface.
+
+        Une exception assumée à « le plan affiché est le plan exécuté » : la
+        liste des processus est RECALCULÉE au moment de l'exécution. Dans une
+        urgence, geler la photographie prise trois minutes plus tôt serait
+        moins juste que geler ce qui écrit maintenant.
+        """
+        incident = self._need("incident_mode")
+
+        def plan():
+            sequence = incident.preparer()
+            processus = sequence.get("processus") or []
+            reseau = sequence.get("reseau") or {}
+            gel = sequence.get("gel") or {}
+            sauvegarde = sequence.get("sauvegarde") or {}
+
+            def dispo(bloc, quoi):
+                return quoi if bloc.get("disponible") else quoi + " — indisponible ici"
+
+            # `reason` et non `note` : c'est la clé que lit normalizePlan côté
+            # interface pour afficher le motif en regard de chaque ligne.
+            items = [{"path": (p.get("nom") or "?") + " (PID " + str(p.get("pid")) + ")",
+                      "reason": p.get("raison") or p.get("motif") or "processus candidat au gel"}
+                     for p in processus]
+            if not items:
+                items = [{"path": "Aucun processus candidat au gel",
+                          "reason": "les trois autres étapes s'exécutent quand même"}]
+
+            return {
+                # Le plan du module, intact : rien n'est retiré de ce qu'il dit.
+                "sequence": sequence,
+                "steps": [
+                    dispo(reseau, "1/4 — Couper le réseau (règle de pare-feu "
+                                  + str(reseau.get("regle", "AZ_INCIDENT")) + ")"),
+                    dispo(gel, "2/4 — Geler " + str(len(processus))
+                          + " processus suspect(s) — suspension, jamais arrêt"),
+                    dispo(sauvegarde, "3/4 — Cliché instantané VSS de "
+                          + str(len(sauvegarde.get("dossiers") or [])) + " dossier(s) personnel(s)"),
+                    "4/4 — Rapport horodaté : gelés, connexions, fichiers modifiés",
+                ],
+                "items": items,
+                "count": 4,
+                "deja_actif": bool(sequence.get("deja_actif")),
+                "note": " ".join(sequence.get("avertissements") or []),
+            }
+
+        return self._guarded("incident_activate", params, plan,
+                             lambda: self._v2(incident.activer()))
+
+    def a_incident_restore(self, params: Dict) -> Dict:
+        """Sortie du mode. Aucune confirmation : c'est la porte de secours,
+        elle doit rester à un clic."""
+        return self._v2(self._need("incident_mode").retablir())
+
+    # ── Historique unifié ────────────────────────────────────────
+    def a_history_list(self, params: Dict) -> Dict:
+        limite = params.get("limite", params.get("limit", 50))
+        try:
+            limite = max(1, min(1000, int(limite)))
+        except (TypeError, ValueError):
+            limite = 50
+        filtre = params.get("filtre", params.get("filter"))
+        if isinstance(filtre, str) and not filtre.strip():
+            filtre = None
+        # Un filtre exécutable ne peut pas venir du réseau : seules les formes
+        # déclaratives du module (texte, liste, objet) sont acceptées.
+        if not isinstance(filtre, (str, list, dict, type(None))):
+            filtre = None
+        return self._v2(self._need("history").lister(limite, filtre))
+
+    def a_history_undo(self, params: Dict) -> Dict:
+        """Annulation d'une entrée. Non destructive par construction : elle
+        REMET en place ce qu'une action avait retiré."""
+        entry_id = str(self._require(params, "id"))
+        return self._v2(self._need("history").annuler(entry_id))
 
     # ── Utilitaires de validation des paramètres ─────────────────
     @staticmethod

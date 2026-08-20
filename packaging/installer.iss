@@ -1,4 +1,4 @@
-; ============================================================================
+﻿; ============================================================================
 ;  packaging/installer.iss — installeur Windows d'ANTI-ZEEVIRIUS (Inno Setup 6)
 ;
 ;  Produit ANTI-ZEEVIRIUS-Setup.exe : un fichier que l'on double-clique, qui
@@ -159,10 +159,16 @@ begin
   if CurUninstallStep <> usPostUninstall then
     Exit;
 
-  { {localappdata} est résolu dans le profil de l'utilisateur qui désinstalle.
-    Note d'honnêteté : si plusieurs comptes Windows ont utilisé l'application,
-    seules les données de CE compte sont concernées — les autres profils
-    gardent les leurs, ce qui est le comportement souhaitable. }
+  // La constante localappdata est résolue dans le profil de l'utilisateur qui
+  // désinstalle. Note d'honnêteté : si plusieurs comptes Windows ont utilisé
+  // l'application, seules les données de CE compte sont concernées — les autres
+  // profils gardent les leurs, ce qui est le comportement souhaitable.
+  //
+  // Commentaire en `//` et NON en accolades : un commentaire Pascal { ... } se
+  // termine à la PREMIÈRE accolade fermante rencontrée. Comme ce texte citait
+  // une constante Inno entre accolades, le commentaire se refermait au milieu
+  // et la suite devenait du code — « Unknown identifier 'est' », compilation
+  // interrompue. C'est ce qui a fait échouer le premier build.
   DossierDonnees := ExpandConstant('{localappdata}\ANTI-ZEEVIRIUS');
 
   if not DirExists(DossierDonnees) then

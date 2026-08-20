@@ -321,6 +321,8 @@ def print_menu() -> None:
     print(" 28. Nettoyer les raccourcis orphelins (Bureau / Menu Démarrer)")
     print(" 29. Nettoyer les entrées de registre orphelines")
     print(" 30. Détecter les dossiers orphelins (Program Files / AppData)")
+    print("  --- BASES DE DÉTECTION ---")
+    print(" 31. Mettre à jour les signatures (empreintes + règles YARA)")
     print("  0. Quitter")
     print("=" * 60)
 
@@ -922,6 +924,49 @@ def main() -> None:
                 if confirm == "oui":
                     result = engine.residue_cleaner.stage_orphaned_folder(target["path"], target["reason"])
                     print(f"\n{result['message']}")
+
+        elif choice == "31":
+            print("\nMise à jour des bases de détection depuis les sources publiques.")
+            print("Les bases ne sont JAMAIS remplacées par des données invalides :")
+            print("en cas d'échec ou d'absence de réseau, celles en place restent utilisables.\n")
+            from optimizer.signature_updater import SignatureUpdater
+            updater = SignatureUpdater()
+
+            print("Empreintes (MalwareBazaar)...")
+            rh = updater.update_hashes(force=True)
+            if rh["status"] == "ok":
+                print(f"  {rh['ajoutees']} empreinte(s) installée(s).")
+            elif rh["status"] == "inchange":
+                print("  Déjà à jour.")
+            else:
+                print(f"  Échec : {rh.get('raison')}")
+
+            print("\nRègles YARA (signature-base, Florian Roth)...")
+            ry = updater.update_yara_rules(force=True)
+            if ry["status"] == "ok":
+                print(f"  {ry['retenues']} règle(s) installée(s).")
+                if ry.get("ecartees"):
+                    print(f"  {ry['ecartees']} règle(s) écartée(s) car elles ne compilent pas "
+                          f"— écartées une par une, sans désarmer les autres.")
+                if ry.get("rejetees_assemblage"):
+                    print(f"  {len(ry['rejetees_assemblage'])} écartée(s) à l'assemblage.")
+                # Rechargement à chaud des empreintes uniquement : HashScanner
+                # relit son fichier, tandis que YaraScanner compile ses règles
+                # une seule fois à l'initialisation et n'expose pas de
+                # rechargement. Les nouvelles règles YARA ne seront donc
+                # actives qu'au prochain lancement — le dire plutôt que de
+                # laisser croire à une prise en compte immédiate.
+                try:
+                    engine.hash_scanner.reload()
+                    print("\n  Empreintes rechargées, actives immédiatement.")
+                except Exception as e:
+                    print(f"\n  (rechargement des empreintes impossible : {e})")
+                print("  Règles YARA : actives au prochain lancement de l'application.")
+            else:
+                print(f"  Échec : {ry.get('raison')}")
+                if ry.get("echecs_reseau"):
+                    for e in ry["echecs_reseau"]:
+                        print(f"    - {e}")
 
         elif choice == "0":
             if engine._realtime_monitor is not None:

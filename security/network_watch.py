@@ -288,15 +288,27 @@ class NetworkWatch:
 
         Une distance de 1 ou 2 sur un nom qui n'est PAS exactement un nom
         système : c'est la signature d'une imitation (`svch0st`, `winlogin`).
+
+        On retient la référence LA PLUS PROCHE, et l'ordre de parcours est
+        rendu déterministe. Une version antérieure parcourait l'ensemble
+        `NOMS_SYSTEME_IMITES` et renvoyait la première correspondance sous le
+        seuil : comme un `set` Python n'a pas d'ordre stable d'une exécution à
+        l'autre, `1sass.exe` était attribué tantôt à `lsass.exe` (distance 1),
+        tantôt à `csrss.exe` (distance 2). Un antivirus qui désigne un coupable
+        différent à chaque lancement n'est pas utilisable — et le défaut
+        échappait aux tests, qui passaient une fois sur deux selon
+        PYTHONHASHSEED.
         """
         if nom in NOMS_SYSTEME_IMITES:
             return None                      # c'est le vrai
-        for reference in NOMS_SYSTEME_IMITES:
+        meilleure, meilleure_distance = None, None
+        for reference in sorted(NOMS_SYSTEME_IMITES):
             if abs(len(nom) - len(reference)) > 2:
                 continue
-            if 0 < _distance_edition(nom, reference) <= 2:
-                return reference
-        return None
+            d = _distance_edition(nom, reference)
+            if 0 < d <= 2 and (meilleure_distance is None or d < meilleure_distance):
+                meilleure, meilleure_distance = reference, d
+        return meilleure
 
     @staticmethod
     def _chemin_temporaire(chemin: str) -> bool:

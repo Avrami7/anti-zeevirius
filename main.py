@@ -87,7 +87,11 @@ class AntivirusEngine:
             str(BASE_DIR / "cache" / "vt_cache.json"),
         )
         self.phishing_checker = PhishingLinkChecker(str(BASE_DIR / "cache" / "phishing_blocklist.txt"))
-        self.folder_organizer = FolderOrganizer(str(BASE_DIR / "organizer_logs" / "reorg_index.json"))
+        # _paths, et non BASE_DIR : une fois l'application installée, les
+        # données vivent dans %LOCALAPPDATA%. Avec l'ancien chemin, le menu CLI
+        # et l'interface web écrivaient DEUX journaux de rangement distincts,
+        # et l'historique unifié n'en voyait qu'un seul.
+        self.folder_organizer = FolderOrganizer(str(_paths.organizer_log()))
         self.ransomware_shield: Optional[RansomwareShield] = None
         self._realtime_thread: Optional[threading.Thread] = None
         self._realtime_monitor: Optional[RealtimeMonitor] = None

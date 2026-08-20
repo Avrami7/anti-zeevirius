@@ -15,3 +15,7 @@ signatures/vt_api_key.txt
 
 # Etat d'execution du lanceur (pid, port, jeton de session)
 runtime.json
+
+# Donnees produites par les modules V2
+history/
+incident/

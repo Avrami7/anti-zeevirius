@@ -270,3 +270,38 @@ class TestVueParApplication:
         assert apps[0]["connexions"] == 2
         assert len(apps[0]["destinations"]) == 2
         assert apps[0]["score_max"] >= SEUIL_SUSPECT
+
+
+class TestDeterminisme:
+    """Un antivirus doit désigner LE MÊME coupable à chaque exécution.
+
+    `_nom_imite` parcourait l'ensemble `NOMS_SYSTEME_IMITES` et renvoyait la
+    première correspondance sous le seuil. Un `set` Python n'ayant pas d'ordre
+    stable d'une exécution à l'autre (aléa de hachage), « 1sass.exe » était
+    attribué tantôt à « lsass.exe » (distance 1), tantôt à « csrss.exe »
+    (distance 2). Le défaut échappait aux tests, qui passaient une fois sur
+    deux selon PYTHONHASHSEED.
+    """
+
+    def test_la_reference_la_plus_proche_gagne(self):
+        """« 1sass.exe » est à distance 1 de lsass et 2 de csrss : lsass doit
+        gagner, quel que soit l'ordre de parcours."""
+        w = NetworkWatch()
+        assert _distance_edition("1sass.exe", "lsass.exe") == 1
+        assert _distance_edition("1sass.exe", "csrss.exe") == 2
+        assert w._nom_imite("1sass.exe") == "lsass.exe"
+
+    def test_stabilite_sous_permutation_de_l_ensemble(self):
+        """Simule l'ordre d'itération variable d'un set en remplaçant la
+        source par des séquences ordonnées différemment."""
+        import security.network_watch as nw
+        original = nw.NOMS_SYSTEME_IMITES
+        try:
+            resultats = set()
+            for ordre in (sorted(original), sorted(original, reverse=True),
+                          list(original)):
+                nw.NOMS_SYSTEME_IMITES = list(ordre)
+                resultats.add(NetworkWatch()._nom_imite("1sass.exe"))
+            assert resultats == {"lsass.exe"}, f"résultat instable : {resultats}"
+        finally:
+            nw.NOMS_SYSTEME_IMITES = original

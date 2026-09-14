@@ -36,7 +36,7 @@ if not getattr(sys, "frozen", False):
 
 import paths  # noqa: E402
 
-APP_TITLE = "ANTI-ZEEVIRIUS — Poste de commandement"
+APP_TITLE = "ANTI-ZEEVIRIUS — Dashboard"
 RUNTIME_FILE = "runtime.json"
 
 

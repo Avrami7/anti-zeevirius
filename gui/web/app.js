@@ -1,5 +1,5 @@
 /* ==========================================================================
-   ANTI-ZEEVIRIUS — poste de commandement
+   ANTI-ZEEVIRIUS — dashboard
    HTML/CSS/JS pur. Aucune dépendance, aucun appel réseau hors 127.0.0.1.
    ========================================================================== */
 (function () {

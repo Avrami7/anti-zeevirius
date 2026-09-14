@@ -77,20 +77,27 @@ HALO_R = 30.0
 # Dégradé du disque d'accrétion, de gauche à droite : braise → orange →
 # blanc-chaud au plus vif (le point où la matière file vers nous) → orange →
 # braise. Repris tel quel de favicon.svg.
+# ASYMÉTRIE VOLONTAIRE. Sur une vraie image de trou noir, le côté du disque
+# qui vient vers l'observateur est BEAUCOUP plus lumineux que celui qui
+# s'éloigne (décalage Doppler relativiste). Une répartition symétrique fait
+# lire un anneau de Saturne, pas un trou noir : c'est précisément ce qui
+# rendait la marque méconnaissable avant cette correction.
 DISK_STOPS: Sequence[Tuple[float, str, float]] = (
-    (0.00, "#b8380a", 1.0),
-    (0.18, "#f2811b", 1.0),
-    (0.50, "#fff6dd", 1.0),
-    (0.82, "#f5871c", 1.0),
-    (1.00, "#b8380a", 1.0),
+    (0.00, "#ffd489", 1.0),
+    (0.12, "#fffdf6", 1.0),
+    (0.30, "#ffe7b0", 1.0),
+    (0.52, "#f7942a", 1.0),
+    (0.78, "#c9540e", 1.0),
+    (1.00, "#8a3a0c", 1.0),
 )
 
 # Arc de lentille : même famille de teintes, mais translucide — c'est une
 # image déviée, pas de la matière.
 LENS_STOPS: Sequence[Tuple[float, str, float]] = (
-    (0.00, "#b8380a", 0.50),
-    (0.50, "#ffe6b4", 0.95),
-    (1.00, "#b8380a", 0.50),
+    (0.00, "#e8a24a", 0.55),
+    (0.16, "#fff6e2", 0.95),
+    (0.45, "#f9a13c", 0.78),
+    (1.00, "#8e3a0b", 0.48),
 )
 
 # Halo radial (rayonnement diffus autour de l'ensemble).

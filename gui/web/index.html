@@ -25,45 +25,55 @@
 <!-- ══ Atelier graphique : dégradés, filtres et pictogrammes, définis une fois ══ -->
 <svg class="sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <radialGradient id="bhHalo" cx="50%" cy="50%" r="50%">
-      <stop offset="0%"   stop-color="#ffb257" stop-opacity=".50"/>
-      <stop offset="38%"  stop-color="#ff7a17" stop-opacity=".22"/>
-      <stop offset="72%"  stop-color="#e04a05" stop-opacity=".07"/>
-      <stop offset="100%" stop-color="#e04a05" stop-opacity="0"/>
+    <!-- Halo nébuleux : chaud au centre, il vire au sombre en s'éloignant.
+         L'image de référence n'a pas un halo net mais un voile filamenteux. -->
+    <radialGradient id="bhHalo" cx="50%" cy="54%" r="52%">
+      <stop offset="0%"   stop-color="#ffb257" stop-opacity=".34"/>
+      <stop offset="30%"  stop-color="#ff7a17" stop-opacity=".22"/>
+      <stop offset="62%"  stop-color="#c2410c" stop-opacity=".12"/>
+      <stop offset="100%" stop-color="#7a2408" stop-opacity="0"/>
     </radialGradient>
-    <!-- DÉCALAGE DOPPLER, franchement asymétrique.
-         Sur une vraie image de trou noir, le côté du disque qui vient vers
-         l'observateur est BEAUCOUP plus lumineux que celui qui s'éloigne.
-         L'ancienne version était symétrique — c'est ce qui la faisait lire
-         comme un anneau de Saturne plutôt que comme un trou noir. -->
-    <linearGradient id="bhDisk" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%"   stop-color="#ffd489"/>
-      <stop offset="12%"  stop-color="#fffdf6"/>
-      <stop offset="26%"  stop-color="#ffe7b0"/>
-      <stop offset="46%"  stop-color="#f7942a"/>
-      <stop offset="68%"  stop-color="#d4600f"/>
-      <stop offset="86%"  stop-color="#a8450c"/>
-      <stop offset="100%" stop-color="#8a3a0c"/>
+
+    <!-- LES AILES du disque, vues par la tranche. Brillantes et blanches près
+         de l'horizon, elles s'effilent en pointes ambrées vers l'extérieur. -->
+    <linearGradient id="bhWing" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#b8420c" stop-opacity=".55"/>
+      <stop offset="16%"  stop-color="#f08324" stop-opacity=".92"/>
+      <stop offset="38%"  stop-color="#ffd79a" stop-opacity="1"/>
+      <stop offset="50%"  stop-color="#fffdf6" stop-opacity="1"/>
+      <stop offset="62%"  stop-color="#ffd79a" stop-opacity="1"/>
+      <stop offset="84%"  stop-color="#ef7f20" stop-opacity=".92"/>
+      <stop offset="100%" stop-color="#a8380a" stop-opacity=".55"/>
     </linearGradient>
+
+    <!-- L'arc supérieur : l'arrière du disque, relevé par la lentille. -->
     <linearGradient id="bhArc" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%"   stop-color="#e8a24a" stop-opacity=".55"/>
-      <stop offset="16%"  stop-color="#fff6e2" stop-opacity=".95"/>
-      <stop offset="40%"  stop-color="#f9a13c" stop-opacity=".80"/>
-      <stop offset="70%"  stop-color="#b8500f" stop-opacity=".62"/>
-      <stop offset="100%" stop-color="#8e3a0b" stop-opacity=".50"/>
+      <stop offset="0%"   stop-color="#a8380a" stop-opacity=".45"/>
+      <stop offset="20%"  stop-color="#f4902c" stop-opacity=".92"/>
+      <stop offset="50%"  stop-color="#fff6e2" stop-opacity="1"/>
+      <stop offset="80%"  stop-color="#f08324" stop-opacity=".92"/>
+      <stop offset="100%" stop-color="#a8380a" stop-opacity=".45"/>
     </linearGradient>
+
+    <!-- LA BANDE qui traverse la sphère : l'avant du disque, le point le plus
+         lumineux de toute l'image. Quasiment blanc. -->
+    <linearGradient id="bhBand" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#ffcf92" stop-opacity=".75"/>
+      <stop offset="28%"  stop-color="#fffefb" stop-opacity="1"/>
+      <stop offset="72%"  stop-color="#fffdf6" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#ffcf92" stop-opacity=".75"/>
+    </linearGradient>
+
     <linearGradient id="bhHot" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0%"   stop-color="#ffd9a0" stop-opacity="0"/>
       <stop offset="45%"  stop-color="#fffaf0" stop-opacity="1"/>
       <stop offset="100%" stop-color="#ffd9a0" stop-opacity="0"/>
     </linearGradient>
-    <!-- L'ombre d'un trou noir est NOIRE, uniformément. L'ancien dégradé
-         l'éclaircissait vers le bas, ce qui lui donnait l'aspect d'une sphère
-         éclairée — donc d'une planète. -->
     <radialGradient id="bhCore" cx="50%" cy="50%" r="50%">
       <stop offset="0%"   stop-color="#000000"/>
       <stop offset="100%" stop-color="#000000"/>
     </radialGradient>
+    <clipPath id="bhSphere"><circle cx="120" cy="118" r="44"/></clipPath>
     <linearGradient id="gScore" x1="0" y1="1" x2="1" y2="0">
       <stop offset="0%"   stop-color="#e2560f"/>
       <stop offset="55%"  stop-color="#ff9f36"/>
@@ -107,54 +117,73 @@
 
   <!-- ══ La marque : trou noir et son disque d'accrétion ══ -->
   <symbol id="blackhole" viewBox="0 0 240 240">
-    <!-- LA MARQUE.
-         Structure d'une vraie image de trou noir, dans l'ordre de profondeur :
-           1. halo chaud diffus
-           2. la moitié ARRIÈRE du disque, courbée par la gravité AU-DESSUS de
-              l'ombre — c'est la lentille gravitationnelle. Elle part des mêmes
-              extrémités que le disque équatorial pour former UNE SEULE courbe
-              continue : un arc détaché donnerait un anneau de Saturne.
-           3. l'ombre : un disque NOIR PUR, sans dégradé.
-           4. la moitié AVANT du disque, qui passe DEVANT l'ombre.
-         Le tout franchement asymétrique (décalage Doppler) : c'est ce qui
-         distingue un trou noir d'un anneau. -->
-    <g class="bh-halo"><circle cx="120" cy="120" r="118" fill="url(#bhHalo)"/></g>
+    <!-- LA MARQUE — d'après la référence fournie par le propriétaire.
+         Proportions relevées sur l'image : le disque est BEAUCOUP plus large
+         que la sphère (la sphère fait environ 37 % de la largeur totale), et
+         les ailes s'effilent en pointes fines. Un disque aussi large que la
+         sphère produit un anneau ; c'est l'envergure qui fait le trou noir.
+         Ordre : voile → ailes → arc de lentille → sphère → bande incandescente. -->
+
+    <g class="bh-halo"><ellipse cx="120" cy="122" rx="119" ry="86" fill="url(#bhHalo)"/></g>
     <g class="bh-stars">
-      <circle cx="30" cy="40" r="1.1"/><circle cx="210" cy="54" r="1.2"/>
-      <circle cx="198" cy="192" r="1"/><circle cx="44" cy="198" r="1.2"/>
-      <circle cx="120" cy="20" r="1"/><circle cx="20" cy="132" r="1"/>
+      <circle cx="24" cy="36" r="1"/><circle cx="216" cy="44" r="1.1"/>
+      <circle cx="204" cy="198" r=".9"/><circle cx="34" cy="202" r="1.1"/>
+      <circle cx="120" cy="16" r=".8"/><circle cx="14" cy="146" r=".8"/>
     </g>
 
-    <!-- 2. arrière du disque, relevé par la lentille -->
-    <path class="bh-bloom" d="M22 128 A 98 60 0 0 1 218 128" fill="none"
-          stroke="url(#bhArc)" stroke-width="17" stroke-linecap="round"
-          filter="url(#bhWide)" opacity=".42"/>
-    <path class="bh-back" d="M22 128 A 98 60 0 0 1 218 128" fill="none"
-          stroke="url(#bhArc)" stroke-width="8.5" stroke-linecap="round"
+    <!-- AILES : épaisses près de l'horizon, effilées jusqu'à la pointe.
+         Le bord supérieur remonte légèrement vers l'extérieur, comme sur la
+         référence, ce qui donne la silhouette d'aile et non de lentille. -->
+    <path class="bh-bloom"
+          d="M3 136 C 40 118, 74 120, 104 128 L 136 128 C 166 120, 200 118, 237 136
+             C 200 144, 166 140, 136 134 L 104 134 C 74 140, 40 144, 3 136 Z"
+          fill="url(#bhWing)" opacity=".34" filter="url(#bhWide)"/>
+    <path class="bh-front"
+          d="M5 135.5 C 42 120, 76 122, 105 129 L 135 129 C 164 122, 198 120, 235 135.5
+             C 198 142, 164 138, 135 133 L 105 133 C 76 138, 42 142, 5 135.5 Z"
+          fill="url(#bhWing)"/>
+    <path class="bh-frontl"
+          d="M14 133 C 48 122, 80 124, 106 130 L 134 130 C 160 124, 192 122, 226 133"
+          fill="none" stroke="#fffdf4" stroke-width="1.6" stroke-linecap="round" opacity=".5"/>
+
+    <!-- ARC : l'arrière du disque, relevé par la lentille. Il serre la sphère. -->
+    <path class="bh-back" d="M26 132 A 96 62 0 0 1 214 132" fill="none"
+          stroke="url(#bhArc)" stroke-width="13" stroke-linecap="round"
           filter="url(#bhSoft)"/>
-    <path class="bh-backl" d="M22 128 A 98 60 0 0 1 218 128" fill="none"
-          stroke="#fff6e2" stroke-width="1.7" stroke-linecap="round" opacity=".38"/>
-    <path class="bh-orbit-b" d="M22 128 A 98 60 0 0 1 218 128" fill="none"
-          stroke="url(#bhHot)" stroke-width="3" stroke-linecap="round"
+    <path class="bh-backl" d="M26 132 A 96 62 0 0 1 214 132" fill="none"
+          stroke="#fff8e8" stroke-width="2.4" stroke-linecap="round" opacity=".5"/>
+    <path class="bh-orbit-b" d="M26 132 A 96 62 0 0 1 214 132" fill="none"
+          stroke="url(#bhHot)" stroke-width="3.4" stroke-linecap="round"
           stroke-dasharray="24 280" opacity=".85"/>
 
-    <!-- 3. l'ombre, et l'anneau de photons qui la cerne -->
-    <circle class="bh-shadow" cx="120" cy="120" r="50" fill="url(#bhCore)"/>
-    <circle class="bh-photon" cx="120" cy="120" r="50.8" fill="none"
-            stroke="#ffcf92" stroke-width="1" opacity=".3"/>
+    <!-- LA SPHÈRE : noir pur -->
+    <circle class="bh-shadow" cx="120" cy="118" r="44" fill="url(#bhCore)"/>
 
-    <!-- 4. avant du disque : il passe DEVANT l'ombre.
-         Plus fin que l'arrière, pour lire comme une lame de lumière vue par
-         la tranche et non comme un tube. -->
-    <path class="bh-bloomf" d="M22 128 A 98 19 0 0 0 218 128" fill="none"
-          stroke="url(#bhDisk)" stroke-width="21" stroke-linecap="round"
-          filter="url(#bhWide)" opacity=".45"/>
-    <path class="bh-front" d="M22 128 A 98 19 0 0 0 218 128" fill="none"
-          stroke="url(#bhDisk)" stroke-width="9.5" stroke-linecap="round"/>
-    <path class="bh-frontl" d="M22 128 A 98 19 0 0 0 218 128" fill="none"
-          stroke="#fffdf4" stroke-width="2.2" stroke-linecap="round" opacity=".45"/>
-    <path class="bh-orbit-f" d="M22 128 A 98 19 0 0 0 218 128" fill="none"
-          stroke="url(#bhHot)" stroke-width="4.4" stroke-linecap="round"
+    <!-- LA BANDE incandescente qui la traverse : l'avant du disque passant
+         DEVANT l'horizon. Point le plus lumineux, et trait le plus
+         reconnaissable de l'image de référence. -->
+    <!-- La sphère va de y=74 à y=162. La bande se place aux deux tiers de sa
+         hauteur et s'arrête AVANT le bas : sur la référence, le dessous de la
+         sphère reste sombre. Une bande qui descend jusqu'au bord donne un
+         demi-disque blanc, pas un trou noir traversé par son disque. -->
+    <!-- Elle n'est PAS droite : l'avant du disque est le point le plus proche
+         d'une ellipse vue de trois quarts, donc la bande s'incurve vers le bas
+         au centre. Et elle n'a pas d'arête : un rectangle blanc donne un
+         drapeau, pas une incandescence. D'où trois passes — voile flou, corps,
+         coeur — sur le meme trace. -->
+    <g clip-path="url(#bhSphere)">
+      <path d="M48 126 Q 120 140, 192 126" fill="none" stroke="url(#bhBand)"
+            stroke-width="19" opacity=".4" filter="url(#bhSoft)"/>
+      <path d="M48 126 Q 120 140, 192 126" fill="none" stroke="url(#bhBand)"
+            stroke-width="9" opacity=".92" filter="url(#bhSoft)"/>
+      <path class="bh-frontl" d="M48 126 Q 120 140, 192 126" fill="none"
+            stroke="#fffefa" stroke-width="3.4" opacity=".95"/>
+    </g>
+    <circle class="bh-photon" cx="120" cy="118" r="44.5" fill="none"
+            stroke="#ffcf92" stroke-width=".9" opacity=".3"/>
+
+    <path class="bh-orbit-f" d="M8 140 C 50 132, 88 132, 120 136 C 152 132, 190 132, 232 140"
+          fill="none" stroke="url(#bhHot)" stroke-width="4.4" stroke-linecap="round"
           stroke-dasharray="28 300" opacity=".9"/>
   </symbol>
 </svg>

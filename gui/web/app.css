@@ -937,3 +937,182 @@ button,input,select{font:inherit;color:inherit}
   .btn-incident[data-actif="true"]{animation:none;box-shadow:0 0 0 3px rgba(255,61,105,.35)}
   .alarm{animation:none;border-color:var(--danger)}
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   COUCHE ASSISTANT — console de commande, télémétrie, fil d'alertes,
+   suggestions, mode autonome.
+   Règles ajoutées EN FIN DE FEUILLE, sans jamais toucher à une déclaration
+   existante : le vocabulaire visuel du produit (panneau, pastille, puce,
+   tableau, encart d'avertissement) est réemployé tel quel. Une seule forme
+   nouvelle est introduite, et elle porte l'argument de toute la section :
+   l'escalier 01 → 02, qui montre à l'œil que comprendre et exécuter sont
+   deux gestes distincts, et la jauge de confiance dont le SEUIL est imprimé
+   — on voit si la lecture franchit la barre, on ne le devine pas.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── L'escalier : 01 comprendre, 02 exécuter ───────────────────────────── */
+.as-step{display:grid;grid-template-columns:38px minmax(0,1fr);gap:14px;position:relative}
+.as-step-n{
+  position:relative;display:grid;place-items:center;
+  width:38px;height:38px;border-radius:12px;
+  font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.02em;
+  color:var(--brand-2);background:rgba(255,154,46,.11);border:1px solid var(--line-hot);
+}
+/* Le filet qui relie les deux marches : la progression est réelle, elle est
+   donc dessinée. Il s'arrête de lui-même sur la dernière marche. */
+.as-step:not(.as-step-2) .as-step-n::after{
+  content:"";position:absolute;top:calc(100% + 7px);left:50%;width:1px;height:2000px;
+  background:linear-gradient(180deg,var(--line-hot),rgba(255,214,170,.06));
+}
+.as-step-b{min-width:0;display:flex;flex-direction:column;gap:11px}
+.as-step-t{font-size:14.5px;font-weight:650;letter-spacing:-.01em;color:var(--tx-1)}
+.as-step-2{padding-top:4px}
+/* Étape 02 verrouillée : lisible, mais visiblement éteinte. Un bouton grisé
+   sans explication est un cul-de-sac ; la note dit pourquoi. */
+.as-step-2[data-etat="vide"] .as-step-n,
+.as-step-2[data-etat="refusee"] .as-step-n{color:var(--tx-4);background:rgba(0,0,0,.32);border-color:var(--line)}
+.as-step-2[data-etat="refusee"] .as-step-n{color:var(--warn);border-color:var(--warn-line);background:var(--warn-dim)}
+.as-step-2[data-etat="prete"] .as-step-n{
+  color:#2a1102;background:linear-gradient(135deg,var(--brand-2),var(--brand));border-color:var(--brand);
+  box-shadow:0 4px 18px -6px var(--brand-glow);
+}
+.as-step-2[data-etat="prete"] .as-step-t{color:var(--hot)}
+
+.as-cmd-row{gap:10px}
+.as-phrase{flex:1 1 320px;min-width:0;height:44px;font-family:var(--sans);font-size:14px}
+.as-cmd-row .btn{height:44px}
+
+.as-ex-row{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+.as-ex-l{font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--tx-4);font-weight:650;margin-right:2px}
+.as-ex{
+  padding:5px 11px;border-radius:999px;cursor:pointer;
+  font-size:12px;color:var(--tx-2);background:var(--glass);border:1px solid var(--line);
+  transition:color .18s,border-color .18s,background .18s;
+}
+.as-ex:hover{color:var(--hot);background:var(--glass-2);border-color:var(--line-hot)}
+
+/* ── La lecture d'intention : le seul endroit où cette section hausse le ton ── */
+.as-read{
+  position:relative;padding:17px 19px 18px;border-radius:var(--r-m);
+  display:flex;flex-direction:column;gap:13px;overflow:hidden;
+  background:linear-gradient(168deg,rgba(255,154,46,.075),rgba(0,0,0,.34) 62%);
+  border:1px solid var(--line-hot);
+}
+.as-read::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:2px;
+  background:linear-gradient(180deg,var(--hot),var(--brand),var(--brand-3));
+}
+.as-read[data-etat="refusee"]{
+  background:linear-gradient(168deg,var(--warn-dim),rgba(0,0,0,.34) 62%);
+  border-color:var(--warn-line);
+}
+.as-read[data-etat="refusee"]::before{background:linear-gradient(180deg,var(--warn),rgba(255,217,77,.35))}
+.as-read-h{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.as-read-k{font-size:10.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--brand-2);font-weight:700}
+.as-read[data-etat="refusee"] .as-read-k{color:var(--warn)}
+.as-read-h .chip{margin-left:auto}
+.as-read-t{font-size:19px;font-weight:650;letter-spacing:-.02em;line-height:1.25;color:var(--tx-1)}
+.as-read-d{font-size:13px;color:var(--tx-2);line-height:1.6}
+.as-just{
+  font-size:13px;color:var(--tx-2);line-height:1.65;
+  padding:11px 13px;border-radius:var(--r-s);background:rgba(0,0,0,.34);border:1px solid var(--line);
+}
+
+/* ── Jauge de confiance, seuil imprimé ─────────────────────────────────── */
+.as-conf{display:flex;flex-direction:column;gap:8px}
+.as-conf-h{display:flex;align-items:baseline;gap:10px}
+.as-conf-l{font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--tx-4);font-weight:650}
+.as-conf-v{margin-left:auto;font-size:22px;font-weight:300;letter-spacing:-.02em;line-height:1;color:var(--hot)}
+.as-conf[data-franchi="false"] .as-conf-v{color:var(--warn)}
+.as-conf-bar{position:relative;height:9px;border-radius:999px;background:rgba(0,0,0,.5);border:1px solid var(--line);overflow:visible}
+.as-conf-fill{
+  display:block;height:100%;width:0;border-radius:999px;
+  background:linear-gradient(90deg,var(--brand-3),var(--brand),var(--brand-2));
+  box-shadow:0 0 14px -2px var(--brand-glow);
+  transition:width .45s var(--ease);
+}
+.as-conf[data-franchi="false"] .as-conf-fill{background:linear-gradient(90deg,rgba(255,217,77,.5),var(--warn));box-shadow:none}
+/* Le seuil : une barre franche et son étiquette. C'est la seule façon de
+   rendre lisible « sous le seuil » sans demander de croire un adjectif. */
+.as-conf-seuil{position:absolute;top:-5px;bottom:-5px;width:2px;background:var(--tx-2);border-radius:2px;pointer-events:none}
+.as-conf-seuil span{
+  position:absolute;left:50%;transform:translateX(-50%);top:-15px;
+  font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--tx-3);
+  font-weight:650;font-style:normal;white-space:nowrap;
+}
+.as-conf-n{font-size:12px;color:var(--tx-3);line-height:1.5}
+
+/* ── Paramètres manquants : demandés, jamais devinés ───────────────────── */
+.as-params{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;
+  padding:12px 13px;border-radius:var(--r-m);background:rgba(0,0,0,.3);border:1px dashed var(--line-2);
+}
+.as-params .as-params-h{grid-column:1/-1;font-size:11.5px;color:var(--tx-3);line-height:1.5}
+.as-param{display:flex;flex-direction:column;gap:5px;min-width:0}
+.as-param span{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--tx-4);font-weight:650}
+.as-param .inp{width:100%;max-width:none}
+
+/* ── Télémétrie ────────────────────────────────────────────────────────── */
+.as-gauges{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.as-g{padding:11px 12px;border-radius:var(--r-m);background:rgba(0,0,0,.3);border:1px solid var(--line);min-width:0}
+.as-g b{display:block;font-size:21px;font-weight:300;letter-spacing:-.03em;color:var(--hot);line-height:1.1}
+.as-g span{display:block;font-size:10.5px;color:var(--tx-3);margin-top:4px;letter-spacing:.03em}
+.as-g[data-tone="warn"]{border-color:var(--warn-line);background:linear-gradient(180deg,var(--warn-dim),rgba(0,0,0,.3))}
+.as-g[data-tone="warn"] b{color:var(--warn)}
+.as-g[data-tone="danger"]{border-color:var(--danger-line);background:linear-gradient(180deg,var(--danger-dim),rgba(0,0,0,.3))}
+.as-g[data-tone="danger"] b{color:var(--danger)}
+.as-g.is-mute b{color:var(--tx-4);font-size:17px}
+.as-chart{
+  position:relative;border-radius:var(--r-m);background:rgba(0,0,0,.3);border:1px solid var(--line);
+  padding:10px 12px 6px;min-height:118px;
+}
+.as-chart .empty{padding:32px 10px;text-align:center;color:var(--tx-4);font-size:12.5px}
+.as-chart svg{display:block;width:100%;height:96px;overflow:visible}
+.as-chart .ac-grid{stroke:rgba(255,214,170,.12);stroke-width:1;stroke-dasharray:3 4}
+.as-chart .ac-area{fill:url(#asTeleGrad);stroke:none}
+.as-chart .ac-line{fill:none;stroke:var(--brand);stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round}
+.as-chart .ac-dot{fill:var(--hot);stroke:var(--brand-3);stroke-width:1}
+.as-chart .ac-lbl{fill:var(--tx-4);font-size:9.5px;letter-spacing:.06em}
+.as-chart-foot{display:flex;gap:10px;justify-content:space-between;font-size:10.5px;color:var(--tx-4);margin-top:5px}
+
+/* ── Fil d'alertes et suggestions : puces d'urgence ────────────────────── */
+.as-urg{
+  flex:none;display:grid;place-items:center;width:26px;height:26px;border-radius:9px;
+  font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums;
+  color:var(--info);background:var(--info-dim);border:1px solid var(--info-line);
+}
+.as-urg[data-u="1"]{color:var(--brand-2);background:rgba(255,154,46,.14);border-color:var(--line-hot)}
+.as-urg[data-u="2"]{color:var(--warn);background:var(--warn-dim);border-color:var(--warn-line)}
+.as-urg[data-u="3"]{color:var(--danger);background:var(--danger-dim);border-color:var(--danger-line)}
+.trow.is-acq{opacity:.55}
+.trow.is-acq .tmain b{font-weight:500}
+.as-when{flex:none;font-size:11px;color:var(--tx-4);font-variant-numeric:tabular-nums;min-width:84px;text-align:right}
+
+/* ── Journal du mode autonome ──────────────────────────────────────────── */
+.as-jrow{display:flex;align-items:baseline;gap:11px;padding:8px 13px;border-bottom:1px solid rgba(255,214,170,.05);font-size:12.5px}
+.as-jrow:last-child{border-bottom:0}
+.as-jrow time{flex:none;font-size:11px;color:var(--tx-4);font-variant-numeric:tabular-nums;min-width:62px}
+.as-jrow .as-jk{
+  flex:none;font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;
+  padding:2px 7px;border-radius:999px;color:var(--tx-3);background:rgba(0,0,0,.34);border:1px solid var(--line);
+}
+.as-jrow[data-t="action"] .as-jk{color:var(--brand-2);border-color:var(--line-hot);background:rgba(255,154,46,.12)}
+.as-jrow[data-t="suggestion"] .as-jk{color:var(--info);border-color:var(--info-line);background:var(--info-dim)}
+.as-jrow[data-t="erreur"] .as-jk{color:var(--danger);border-color:var(--danger-line);background:var(--danger-dim)}
+.as-jrow[data-t="demarrage"] .as-jk,.as-jrow[data-t="arret"] .as-jk{color:var(--warn);border-color:var(--warn-line);background:var(--warn-dim)}
+.as-jrow p{flex:1;min-width:0;color:var(--tx-2);line-height:1.45;overflow-wrap:anywhere}
+
+/* ── Adaptations aux fenêtres étroites ─────────────────────────────────── */
+@media (max-width:900px){
+  .as-gauges{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:560px){
+  .as-step{grid-template-columns:30px minmax(0,1fr);gap:11px}
+  .as-step-n{width:30px;height:30px;border-radius:10px;font-size:11.5px}
+  .as-read-t{font-size:17px}
+  .as-phrase{flex:1 1 100%}
+  .as-cmd-row .btn{flex:1 1 auto}
+  .as-when{min-width:0;text-align:left}
+  .as-jrow{flex-wrap:wrap;gap:7px}
+  .as-jrow p{flex:1 1 100%}
+}

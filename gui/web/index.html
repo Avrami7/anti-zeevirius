@@ -25,43 +25,58 @@
 <!-- ══ Atelier graphique : dégradés, filtres et pictogrammes, définis une fois ══ -->
 <svg class="sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <!-- Halo nébuleux : chaud au centre, il vire au sombre en s'éloignant.
-         L'image de référence n'a pas un halo net mais un voile filamenteux. -->
-    <radialGradient id="bhHalo" cx="50%" cy="54%" r="52%">
-      <stop offset="0%"   stop-color="#ffb257" stop-opacity=".34"/>
-      <stop offset="30%"  stop-color="#ff7a17" stop-opacity=".22"/>
-      <stop offset="62%"  stop-color="#c2410c" stop-opacity=".12"/>
+    <!-- Halo : DECENTRE vers la gauche. Sur la reference, le voile chaud n'est
+         pas concentrique — il suit le cote lumineux du disque. -->
+    <radialGradient id="bhHalo" cx="43%" cy="52%" r="56%">
+      <stop offset="0%"   stop-color="#ffbe6a" stop-opacity=".20"/>
+      <stop offset="34%"  stop-color="#ff8420" stop-opacity=".12"/>
+      <stop offset="66%"  stop-color="#c2410c" stop-opacity=".05"/>
       <stop offset="100%" stop-color="#7a2408" stop-opacity="0"/>
     </radialGradient>
 
-    <!-- LES AILES du disque, vues par la tranche. Brillantes et blanches près
-         de l'horizon, elles s'effilent en pointes ambrées vers l'extérieur. -->
-    <linearGradient id="bhWing" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%"   stop-color="#b8420c" stop-opacity=".55"/>
-      <stop offset="16%"  stop-color="#f08324" stop-opacity=".92"/>
-      <stop offset="38%"  stop-color="#ffd79a" stop-opacity="1"/>
-      <stop offset="50%"  stop-color="#fffdf6" stop-opacity="1"/>
-      <stop offset="62%"  stop-color="#ffd79a" stop-opacity="1"/>
-      <stop offset="84%"  stop-color="#ef7f20" stop-opacity=".92"/>
-      <stop offset="100%" stop-color="#a8380a" stop-opacity=".55"/>
+    <!-- LE DISQUE, en un seul degrade traversant. Le point le plus chaud est a
+         42 % de la largeur, donc A GAUCHE du centre : c'est le cote qui vient
+         vers l'observateur, rendu bien plus lumineux par le decalage Doppler
+         relativiste. Mesure relevee sur la reference : masse lumineuse
+         gauche/droite = 1,13, et colonne la plus brillante a 40 % de la largeur.
+         Un degrade symetrique donne un anneau de Saturne — c'est exactement ce
+         qui rendait les versions precedentes meconnaissables. -->
+    <linearGradient id="bhDisk" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#8a3410" stop-opacity="0"/>
+      <stop offset="10%"  stop-color="#e07a22" stop-opacity=".55"/>
+      <stop offset="26%"  stop-color="#ffc888" stop-opacity=".92"/>
+      <stop offset="42%"  stop-color="#fffaf0" stop-opacity="1"/>
+      <stop offset="55%"  stop-color="#fff0d4" stop-opacity="1"/>
+      <stop offset="70%"  stop-color="#f5a44a" stop-opacity=".90"/>
+      <stop offset="86%"  stop-color="#c9541a" stop-opacity=".55"/>
+      <stop offset="100%" stop-color="#6d2606" stop-opacity="0"/>
     </linearGradient>
 
-    <!-- L'arc supérieur : l'arrière du disque, relevé par la lentille. -->
-    <linearGradient id="bhArc" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%"   stop-color="#a8380a" stop-opacity=".45"/>
-      <stop offset="20%"  stop-color="#f4902c" stop-opacity=".92"/>
-      <stop offset="50%"  stop-color="#fff6e2" stop-opacity="1"/>
-      <stop offset="80%"  stop-color="#f08324" stop-opacity=".92"/>
-      <stop offset="100%" stop-color="#a8380a" stop-opacity=".45"/>
+    <!-- Brins fins : les filaments de matiere. La reference ne montre pas un
+         degrade lisse mais des stries. -->
+    <linearGradient id="bhStrand" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="30%"  stop-color="#fff6e6" stop-opacity=".75"/>
+      <stop offset="52%"  stop-color="#ffffff" stop-opacity=".95"/>
+      <stop offset="74%"  stop-color="#ffd7a2" stop-opacity=".55"/>
+      <stop offset="100%" stop-color="#e8934a" stop-opacity="0"/>
     </linearGradient>
 
-    <!-- LA BANDE qui traverse la sphère : l'avant du disque, le point le plus
-         lumineux de toute l'image. Quasiment blanc. -->
+    <!-- L'ANNEAU DE PHOTONS : il encercle la sphere ENTIEREMENT, il ne s'arrete
+         pas en bande. Le plus vif en bas a gauche, tenu en haut a droite. -->
+    <linearGradient id="bhRing" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="32%"  stop-color="#fff8ea" stop-opacity=".92"/>
+      <stop offset="66%"  stop-color="#ffe9c4" stop-opacity=".82"/>
+      <stop offset="100%" stop-color="#ffc98a" stop-opacity=".62"/>
+    </linearGradient>
+
+    <!-- LA BANDE lensee qui traverse la sphere a son tiers inferieur. -->
     <linearGradient id="bhBand" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%"   stop-color="#ffcf92" stop-opacity=".75"/>
-      <stop offset="28%"  stop-color="#fffefb" stop-opacity="1"/>
-      <stop offset="72%"  stop-color="#fffdf6" stop-opacity="1"/>
-      <stop offset="100%" stop-color="#ffcf92" stop-opacity=".75"/>
+      <stop offset="0%"   stop-color="#ffcf92" stop-opacity=".55"/>
+      <stop offset="26%"  stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="62%"  stop-color="#fffdf6" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#ffbe72" stop-opacity=".45"/>
     </linearGradient>
 
     <linearGradient id="bhHot" x1="0" y1="0" x2="1" y2="0">
@@ -69,11 +84,18 @@
       <stop offset="45%"  stop-color="#fffaf0" stop-opacity="1"/>
       <stop offset="100%" stop-color="#ffd9a0" stop-opacity="0"/>
     </linearGradient>
-    <radialGradient id="bhCore" cx="50%" cy="50%" r="50%">
-      <stop offset="0%"   stop-color="#000000"/>
+
+    <!-- L'interieur de la sphere n'est PAS noir pur. La reference y montre une
+         luminance olive tres faible, plus claire vers le haut-gauche : c'est
+         l'image de l'arriere du disque, ramenee la par la courbure. Du noir pur
+         donne un trou de decoupe, pas un horizon. -->
+    <radialGradient id="bhCore" cx="40%" cy="36%" r="64%">
+      <stop offset="0%"   stop-color="#23251b"/>
+      <stop offset="48%"  stop-color="#0c0d09"/>
       <stop offset="100%" stop-color="#000000"/>
     </radialGradient>
-    <clipPath id="bhSphere"><circle cx="120" cy="118" r="44"/></clipPath>
+
+    <clipPath id="bhSphere"><circle cx="120" cy="116" r="38"/></clipPath>
     <linearGradient id="gScore" x1="0" y1="1" x2="1" y2="0">
       <stop offset="0%"   stop-color="#e2560f"/>
       <stop offset="55%"  stop-color="#ff9f36"/>
@@ -117,74 +139,96 @@
 
   <!-- ══ La marque : trou noir et son disque d'accrétion ══ -->
   <symbol id="blackhole" viewBox="0 0 240 240">
-    <!-- LA MARQUE — d'après la référence fournie par le propriétaire.
-         Proportions relevées sur l'image : le disque est BEAUCOUP plus large
-         que la sphère (la sphère fait environ 37 % de la largeur totale), et
-         les ailes s'effilent en pointes fines. Un disque aussi large que la
-         sphère produit un anneau ; c'est l'envergure qui fait le trou noir.
-         Ordre : voile → ailes → arc de lentille → sphère → bande incandescente. -->
+    <!-- LA MARQUE — d'apres docs/identite/reference-trou-noir.png (normative).
+         Echelle : rayon de sphere 75 px sur la photo -> 38 unites ici.
 
-    <g class="bh-halo"><ellipse cx="120" cy="122" rx="119" ry="86" fill="url(#bhHalo)"/></g>
+         TROIS ERREURS CORRIGEES, dans l'ordre ou elles ont ete trouvees en
+         comparant le rendu a la photo :
+
+         1. Des ellipses concentriques donnent SATURNE. La reference n'a aucun
+            anneau : elle a une face avant, une face arriere, et l'anneau de
+            photons. Rien d'autre.
+         2. La face avant est UN SEUL RUBAN CONTINU. Dessiner un panache a
+            gauche et un filet a droite, chacun a sa hauteur, produit deux
+            rubans qui se telescopent au bord de la sphere. Ici un unique trace
+            part de la pointe gauche, passe DEVANT la sphere et ressort a
+            droite : c'est la continuite qui fait lire une orbite.
+         3. Le ruban est ASYMETRIQUE. Large et blanc a gauche — le cote qui
+            vient vers l'observateur, amplifie par le decalage Doppler — il
+            s'affine et vire a l'ambre a droite en remontant. Un ruban
+            symetrique se lit comme un anneau, quel que soit son galbe. -->
+
+    <g class="bh-halo"><ellipse cx="102" cy="132" rx="88" ry="50" fill="url(#bhHalo)"/></g>
     <g class="bh-stars">
-      <circle cx="24" cy="36" r="1"/><circle cx="216" cy="44" r="1.1"/>
-      <circle cx="204" cy="198" r=".9"/><circle cx="34" cy="202" r="1.1"/>
-      <circle cx="120" cy="16" r=".8"/><circle cx="14" cy="146" r=".8"/>
+      <circle cx="26" cy="34" r=".9"/><circle cx="214" cy="42" r="1"/>
+      <circle cx="202" cy="200" r=".8"/><circle cx="32" cy="204" r="1"/>
+      <circle cx="122" cy="14" r=".7"/><circle cx="12" cy="150" r=".8"/>
+      <circle cx="228" cy="124" r=".7"/><circle cx="68" cy="24" r=".7"/>
     </g>
 
-    <!-- AILES : épaisses près de l'horizon, effilées jusqu'à la pointe.
-         Le bord supérieur remonte légèrement vers l'extérieur, comme sur la
-         référence, ce qui donne la silhouette d'aile et non de lentille. -->
-    <path class="bh-bloom"
-          d="M3 136 C 40 118, 74 120, 104 128 L 136 128 C 166 120, 200 118, 237 136
-             C 200 144, 166 140, 136 134 L 104 134 C 74 140, 40 144, 3 136 Z"
-          fill="url(#bhWing)" opacity=".34" filter="url(#bhWide)"/>
-    <path class="bh-front"
-          d="M5 135.5 C 42 120, 76 122, 105 129 L 135 129 C 164 122, 198 120, 235 135.5
-             C 198 142, 164 138, 135 133 L 105 133 C 76 138, 42 142, 5 135.5 Z"
-          fill="url(#bhWing)"/>
-    <path class="bh-frontl"
-          d="M14 133 C 48 122, 80 124, 106 130 L 134 130 C 160 124, 192 122, 226 133"
-          fill="none" stroke="#fffdf4" stroke-width="1.6" stroke-linecap="round" opacity=".5"/>
-
-    <!-- ARC : l'arrière du disque, relevé par la lentille. Il serre la sphère. -->
-    <path class="bh-back" d="M26 132 A 96 62 0 0 1 214 132" fill="none"
-          stroke="url(#bhArc)" stroke-width="13" stroke-linecap="round"
-          filter="url(#bhSoft)"/>
-    <path class="bh-backl" d="M26 132 A 96 62 0 0 1 214 132" fill="none"
-          stroke="#fff8e8" stroke-width="2.4" stroke-linecap="round" opacity=".5"/>
-    <path class="bh-orbit-b" d="M26 132 A 96 62 0 0 1 214 132" fill="none"
-          stroke="url(#bhHot)" stroke-width="3.4" stroke-linecap="round"
-          stroke-dasharray="24 280" opacity=".85"/>
-
-    <!-- LA SPHÈRE : noir pur -->
-    <circle class="bh-shadow" cx="120" cy="118" r="44" fill="url(#bhCore)"/>
-
-    <!-- LA BANDE incandescente qui la traverse : l'avant du disque passant
-         DEVANT l'horizon. Point le plus lumineux, et trait le plus
-         reconnaissable de l'image de référence. -->
-    <!-- La sphère va de y=74 à y=162. La bande se place aux deux tiers de sa
-         hauteur et s'arrête AVANT le bas : sur la référence, le dessous de la
-         sphère reste sombre. Une bande qui descend jusqu'au bord donne un
-         demi-disque blanc, pas un trou noir traversé par son disque. -->
-    <!-- Elle n'est PAS droite : l'avant du disque est le point le plus proche
-         d'une ellipse vue de trois quarts, donc la bande s'incurve vers le bas
-         au centre. Et elle n'a pas d'arête : un rectangle blanc donne un
-         drapeau, pas une incandescence. D'où trois passes — voile flou, corps,
-         coeur — sur le meme trace. -->
-    <g clip-path="url(#bhSphere)">
-      <path d="M48 126 Q 120 140, 192 126" fill="none" stroke="url(#bhBand)"
-            stroke-width="19" opacity=".4" filter="url(#bhSoft)"/>
-      <path d="M48 126 Q 120 140, 192 126" fill="none" stroke="url(#bhBand)"
-            stroke-width="9" opacity=".92" filter="url(#bhSoft)"/>
-      <path class="bh-frontl" d="M48 126 Q 120 140, 192 126" fill="none"
-            stroke="#fffefa" stroke-width="3.4" opacity=".95"/>
+    <!-- ── FACE ARRIERE : l'arc lense au-dessus de la sphere. Fin et pres
+         d'elle : sur la reference il effleure l'horizon, il ne l'enjambe pas
+         en pont. -->
+    <g class="bh-back">
+      <path d="M74 128 C 78 92, 104 64, 132 66 C 164 69, 186 88, 204 110"
+            fill="none" stroke="url(#bhDisk)" stroke-width="12" opacity=".26"
+            filter="url(#bhWide)"/>
+      <path d="M74 128 C 78 92, 104 64, 132 66 C 164 69, 186 88, 204 110"
+            fill="none" stroke="url(#bhDisk)" stroke-width="4.6"
+            stroke-linecap="round"/>
+      <path class="bh-backl"
+            d="M79 127 C 83 97, 106 72, 131 74 C 159 77, 180 93, 197 112"
+            fill="none" stroke="url(#bhStrand)" stroke-width="1.4" opacity=".55"/>
+      <path class="bh-orbit-b"
+            d="M74 128 C 78 92, 104 64, 132 66 C 164 69, 186 88, 204 110"
+            fill="none" stroke="url(#bhHot)" stroke-width="2.6" stroke-linecap="round"
+            stroke-dasharray="20 240" opacity=".8"/>
     </g>
-    <circle class="bh-photon" cx="120" cy="118" r="44.5" fill="none"
-            stroke="#ffcf92" stroke-width=".9" opacity=".3"/>
 
-    <path class="bh-orbit-f" d="M8 140 C 50 132, 88 132, 120 136 C 152 132, 190 132, 232 140"
-          fill="none" stroke="url(#bhHot)" stroke-width="4.4" stroke-linecap="round"
-          stroke-dasharray="28 300" opacity=".9"/>
+    <!-- ── LA SPHERE ─────────────────────────────────────────────────────── -->
+    <circle class="bh-shadow" cx="120" cy="116" r="38" fill="url(#bhCore)"/>
+
+    <!-- Anneau de photons : COMPLET, lumineux sur tout son tour. C'est le
+         trait le plus net de la reference ; sans lui la sphere n'est qu'un
+         disque decoupe dans le fond. -->
+    <circle cx="120" cy="116" r="40.6" fill="none" stroke="url(#bhRing)"
+            stroke-width="5" opacity=".34" filter="url(#bhSoft)"/>
+    <circle class="bh-photon" cx="120" cy="116" r="38.8" fill="none"
+            stroke="url(#bhRing)" stroke-width="2.4"/>
+
+    <!-- ── FACE AVANT : le ruban continu, trace APRES la sphere donc devant.
+         Large de 20 unites a la pointe gauche, 13 devant la sphere, 6 a la
+         pointe droite. -->
+    <g class="bh-front">
+      <path class="bh-bloom"
+            d="M6 147 C 36 141, 76 131, 120 127 C 166 123, 202 116, 234 109
+               C 202 130, 164 141, 120 146 C 78 151, 36 164, 6 147 Z"
+            fill="url(#bhDisk)" opacity=".38" filter="url(#bhWide)"/>
+      <path d="M8 148 C 38 142, 76 133, 120 129 C 165 125, 201 118, 232 111
+               C 201 128, 163 139, 120 144 C 79 149, 38 162, 8 148 Z"
+            fill="url(#bhDisk)"/>
+      <!-- Brins : la matiere est filamenteuse, pas un ruban imprime. -->
+      <path d="M18 150 C 46 145, 80 137, 120 133 C 160 129, 196 122, 226 115"
+            fill="none" stroke="url(#bhStrand)" stroke-width="1.5" opacity=".65"/>
+      <path d="M20 155 C 50 151, 84 143, 120 138 C 156 133, 192 126, 220 119"
+            fill="none" stroke="url(#bhStrand)" stroke-width="1" opacity=".42"/>
+
+      <!-- Le ruban est le plus incandescent la ou il passe devant l'horizon :
+           on rehausse ce seul segment, decoupe au disque de la sphere. -->
+      <g clip-path="url(#bhSphere)">
+        <path d="M74 142 Q 120 137, 170 130" fill="none" stroke="url(#bhBand)"
+              stroke-width="14" opacity=".32" filter="url(#bhSoft)"/>
+        <path d="M74 141 Q 120 136, 170 130" fill="none" stroke="url(#bhBand)"
+              stroke-width="6.5" opacity=".85" filter="url(#bhSoft)"/>
+        <path class="bh-frontl" d="M74 141 Q 120 136, 170 129" fill="none"
+              stroke="#fffefa" stroke-width="2.4" opacity=".95"/>
+      </g>
+
+      <path class="bh-orbit-f"
+            d="M10 152 C 40 147, 76 138, 120 134 C 164 130, 200 122, 230 114"
+            fill="none" stroke="url(#bhHot)" stroke-width="3.4" stroke-linecap="round"
+            stroke-dasharray="24 290" opacity=".85"/>
+    </g>
   </symbol>
 </svg>
 
@@ -229,6 +273,7 @@
   <div class="rail-grp">
     <p class="rail-lbl">Supervision</p>
     <a class="rail-i" href="#/tableau-de-bord" data-view="tableau-de-bord"><svg class="ic"><use href="#i-gauge"/></svg><span>Tableau de bord</span></a>
+    <a class="rail-i" href="#/assistant" data-view="assistant"><svg class="ic"><use href="#i-radar"/></svg><span>Assistant</span><em class="rail-n">5</em></a>
     <a class="rail-i" href="#/historique" data-view="historique"><svg class="ic"><use href="#i-undo"/></svg><span>Historique</span><em class="rail-n">1</em></a>
   </div>
   <div class="rail-grp">
@@ -335,6 +380,202 @@
           <button class="linkbtn" type="button" id="btnClearLog">Vider</button>
         </header>
         <ol class="log" id="log"></ol>
+      </article>
+    </div>
+  </section>
+
+  <!-- ═══════════════ ASSISTANT ═══════════════
+       Une seule idée gouverne cette section, et elle en dicte la forme :
+       comprendre et exécuter sont deux gestes séparés par un clic humain.
+       L'étape 01 ne touche à rien — elle rend une lecture. L'étape 02 reste
+       verrouillée tant que l'étape 01 n'a pas rendu d'intention, et une
+       capacité destructive y ajoute encore le cycle plan → jeton → exécution
+       de la modale de validation. ══════════════════════════════════════════ -->
+  <section class="view" id="view-assistant" data-view="assistant" hidden>
+    <div class="view-head">
+      <h1>Assistant</h1>
+      <p>Une phrase, l'intention qu'il en a comprise — avec sa justification, son niveau de risque et
+        son score de confiance — puis, seulement si vous le demandez, l'exécution.</p>
+    </div>
+
+    <div class="deck">
+
+      <!-- ── Console de commande ─────────────────────────────────────── -->
+      <article class="panel span-4 panel-console" id="pAssistCmd">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-arrow"/></svg> Console de commande</h3>
+          <span class="tag tag-soft">Comprendre n'est pas exécuter</span>
+        </header>
+        <div class="p-body">
+
+          <div class="as-step" id="asStep1">
+            <span class="as-step-n">01</span>
+            <div class="as-step-b">
+              <p class="as-step-t">Dites ce que vous voulez — en français ou en anglais</p>
+              <p class="p-note">Cette étape <b>ne touche à rien</b> : elle rend la capacité reconnue, la
+                justification de cette lecture, son niveau de risque et son score de confiance. Aucune
+                action n'est lancée, même si la phrase en réclame une.</p>
+              <div class="btn-row as-cmd-row">
+                <input class="inp as-phrase" id="asPhrase" type="text" autocomplete="off" spellcheck="false"
+                       placeholder="analyse le dossier Téléchargements" aria-label="Phrase à faire comprendre">
+                <button class="btn btn-primary" type="button" id="btnAsComprendre">
+                  <svg class="ic"><use href="#i-eye"/></svg> Comprendre
+                </button>
+              </div>
+              <div class="as-ex-row">
+                <span class="as-ex-l">Exemples</span>
+                <button class="as-ex" type="button" data-asphrase="état du système">état du système</button>
+                <button class="as-ex" type="button" data-asphrase="liste la quarantaine">liste la quarantaine</button>
+                <button class="as-ex" type="button" data-asphrase="qui s'est connecté à mon PC">qui s'est connecté à mon PC</button>
+                <button class="as-ex" type="button" data-asphrase="clean the temporary files">clean the temporary files</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="as-read" id="asLecture" data-etat="vide" hidden>
+            <div class="as-read-h">
+              <p class="as-read-k" id="asLectKicker">Intention comprise</p>
+              <span class="chip" id="asLectRisque" data-tone="info">—</span>
+            </div>
+            <b class="as-read-t" id="asLectTitre">—</b>
+            <p class="as-read-d" id="asLectDesc">—</p>
+
+            <div class="as-conf" id="asConf" data-franchi="false">
+              <div class="as-conf-h">
+                <span class="as-conf-l">Confiance de la lecture</span>
+                <b class="num as-conf-v" id="asConfVal">—</b>
+              </div>
+              <div class="as-conf-bar">
+                <i class="as-conf-fill" id="asConfFill"></i>
+                <em class="as-conf-seuil" id="asConfSeuil"><span>seuil</span></em>
+              </div>
+              <p class="as-conf-n" id="asConfNote">—</p>
+            </div>
+
+            <p class="as-just" id="asLectJust">—</p>
+            <div class="as-meta" id="asLectMeta"></div>
+          </div>
+
+          <div class="as-step as-step-2" id="asStep2" data-etat="vide">
+            <span class="as-step-n">02</span>
+            <div class="as-step-b">
+              <p class="as-step-t">Exécuter — ce clic-là, et lui seul, engage la machine</p>
+              <p class="p-note" id="asExecNote">Aucune intention lue pour l'instant : l'exécution reste
+                verrouillée. C'est ce verrou qui empêche une phrase mal formulée de déclencher une purge.</p>
+              <div class="as-params" id="asParams" hidden></div>
+              <div class="btn-row">
+                <button class="btn btn-primary" type="button" id="btnAsExecuter" disabled>
+                  <svg class="ic"><use href="#i-check"/></svg> Exécuter cette capacité
+                </button>
+                <button class="btn btn-ghost" type="button" id="btnAsOublier" disabled>Oublier cette lecture</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="jobline" id="asCmdJob" hidden>
+            <span class="bh bh-xs jobbh"><svg viewBox="0 0 240 240"><use href="#blackhole"/></svg></span>
+            <div class="jobline-txt"><b id="asCmdJobTitle">Exécution…</b><span id="asCmdJobCurrent">—</span></div>
+          </div>
+
+          <div class="result" id="asCmdResult" hidden></div>
+        </div>
+      </article>
+
+      <!-- ── Télémétrie ──────────────────────────────────────────────── -->
+      <article class="panel span-2" id="pAssistTele">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-cpu"/></svg> Télémétrie en direct</h3>
+          <span class="statelamp" id="asTeleLamp" data-on="false" title="Échantillonnage actif"></span>
+          <button class="linkbtn" type="button" id="btnAsTele">Actualiser</button>
+        </header>
+        <div class="p-body">
+          <div class="as-gauges">
+            <div class="as-g" id="asGCpu"><b class="num" id="asTeleCpu">—</b><span>processeur</span></div>
+            <div class="as-g" id="asGMem"><b class="num" id="asTeleMem">—</b><span>mémoire</span></div>
+            <div class="as-g" id="asGDisk"><b class="num" id="asTeleDisk">—</b><span>disque système</span></div>
+            <div class="as-g" id="asGTemp"><b class="num" id="asTeleTemp">—</b><span>température</span></div>
+          </div>
+          <div class="seg" role="tablist" aria-label="Grandeur affichée dans l'historique">
+            <button class="seg-i is-on" type="button" data-asmetric="cpu" role="tab" aria-selected="true">Processeur</button>
+            <button class="seg-i" type="button" data-asmetric="memoire" role="tab" aria-selected="false">Mémoire</button>
+            <button class="seg-i" type="button" data-asmetric="disque" role="tab" aria-selected="false">Disque</button>
+          </div>
+          <div class="as-chart" id="asTeleChart"><p class="empty">Historique en construction — chaque lecture ajoute un point.</p></div>
+          <p class="p-note" id="asTeleNote">La télémétrie mesure, elle n'interprète pas : c'est le rôle des suggestions.</p>
+          <div class="result" id="asTeleResult" hidden></div>
+        </div>
+      </article>
+
+      <!-- ── Notifications ───────────────────────────────────────────── -->
+      <article class="panel span-2" id="pAssistNotifs">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-alert"/></svg> Notifications</h3>
+          <span class="chip" id="asNotifCount" data-tone="info">—</span>
+          <button class="linkbtn" type="button" id="btnAsNotifs">Actualiser</button>
+        </header>
+        <div class="p-body">
+          <div class="seg" role="tablist" aria-label="Filtre des notifications">
+            <button class="seg-i is-on" type="button" data-asnotif="" role="tab" aria-selected="true">Tout le fil</button>
+            <button class="seg-i" type="button" data-asnotif="1" role="tab" aria-selected="false">Non acquittées</button>
+          </div>
+          <div class="tbl" id="asNotifTable"><p class="empty">Aucune notification chargée.</p></div>
+          <p class="p-note">Acquitter ne supprime rien : l'alerte reste dans le fil, elle cesse seulement
+            d'être comptée comme non lue.</p>
+          <div class="result" id="asNotifResult" hidden></div>
+        </div>
+      </article>
+
+      <!-- ── Suggestions ─────────────────────────────────────────────── -->
+      <article class="panel span-2" id="pAssistSugg">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-check"/></svg> Suggestions</h3>
+          <span class="chip" id="asSuggCount" data-tone="info">—</span>
+          <button class="linkbtn" type="button" id="btnAsSugg">Actualiser</button>
+        </header>
+        <div class="p-body">
+          <div class="tbl" id="asSuggTable"><p class="empty">Aucune suggestion chargée.</p></div>
+          <p class="p-note">Classées par urgence, chacune accompagnée du fait constaté qui la motive. Une
+            suggestion qui écrit sur le disque ouvrira la même modale de validation que partout ailleurs.</p>
+          <div class="result" id="asSuggResult" hidden></div>
+        </div>
+      </article>
+
+      <!-- ── Mode autonome ───────────────────────────────────────────── -->
+      <article class="panel span-2" id="pAssistAuto">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-power"/></svg> Mode autonome</h3>
+          <span class="statelamp" id="asAutoLamp" data-on="false" title="Surveillance autonome"></span>
+          <button class="linkbtn" type="button" id="btnAsAuto">Actualiser</button>
+        </header>
+        <div class="p-body">
+          <div class="incstate" id="asAutoState" data-actif="false">
+            <span class="incstate-l">État</span>
+            <b class="incstate-v" id="asAutoStateVal">Lecture de l'état…</b>
+            <p class="incstate-m" id="asAutoStateMsg">—</p>
+          </div>
+
+          <div class="warnbox">
+            <p class="warnbox-h">La limite du mode, écrite noir sur blanc</p>
+            <ul>
+              <li>Il n'exécute <b>que des capacités en lecture seule</b> : analyser, inventorier, lire un journal, relever une charge.</li>
+              <li>Tout le reste — quarantaine, rangement, nettoyage, désinstallation, suppression — <b>devient une suggestion</b>, jamais une action.</li>
+              <li>Il ne peut donc <b>rien supprimer, rien déplacer, rien désinstaller</b> : aucun fichier n'est touché sans votre validation explicite.</li>
+              <li>Son budget d'actions par cycle est borné, et l'arrêt prend effet <b>avant l'action suivante</b>, sans attendre la fin du cycle.</li>
+            </ul>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-primary" type="button" id="btnAsAutoStart">
+              <svg class="ic"><use href="#i-power"/></svg> Activer la surveillance autonome
+            </button>
+            <button class="btn btn-danger" type="button" id="btnAsAutoStop">Arrêter immédiatement</button>
+          </div>
+
+          <div id="asAutoKv"></div>
+          <p class="lbl">Journal des actions</p>
+          <div class="tbl" id="asAutoJournal"><p class="empty">Aucun cycle exécuté.</p></div>
+          <div class="result" id="asAutoResult" hidden></div>
+        </div>
       </article>
     </div>
   </section>

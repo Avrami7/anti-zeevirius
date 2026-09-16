@@ -23,6 +23,7 @@ Trois responsabilités, et rien d'autre :
 Ce fichier n'écrit JAMAIS dans les modules métier : il les appelle.
 """
 
+import dataclasses
 import hashlib
 import importlib
 import json
@@ -198,6 +199,31 @@ _MODULE_SPECS: Dict[str, Tuple[str, str, Optional[str], str]] = {
     "history":          ("comfort.history", "HistoriqueUnifie", None, ""),
 }
 
+# ── Couche assistant (docs/ASSISTANT-CONTRAT.md) ─────────────────────
+# Importée paresseusement comme tout le reste : ces modules arrivent par
+# chantiers séparés, et un pont qui refuserait de démarrer parce que l'un
+# d'eux manque rendrait l'interface entière inutilisable pour une couche
+# qui n'est qu'un complément.
+_ASSISTANT_MODULES: Dict[str, str] = {
+    "risk": "assistant.risk",
+    "registry": "assistant.registry",
+    "memory": "assistant.memory",
+    "intent": "assistant.intent",
+    "telemetry": "assistant.telemetry",
+    "notify": "assistant.notify",
+    "proactive": "assistant.proactive",
+    "digest": "assistant.digest",
+    "autonomy": "assistant.autonomy",
+}
+
+# Les neuf actions de la section 10 du contrat, sous leur écriture officielle.
+ASSISTANT_ACTIONS: Tuple[str, ...] = (
+    "assistant.capacites", "assistant.comprendre", "assistant.profil",
+    "assistant.telemetrie", "assistant.notifications", "assistant.acquitter",
+    "assistant.suggestions", "assistant.resume", "assistant.autonomie",
+)
+
+
 # Actions qui n'ont de sens que sous Windows (outils système externes).
 _WINDOWS_ONLY = {"task_scheduler": "schtasks indisponible (planificateur Windows)"}
 
@@ -359,6 +385,12 @@ class Bridge:
         (le serveur répond alors 404, conformément au contrat)."""
         params = params if isinstance(params, dict) else {}
         handler = getattr(self, f"a_{action}", None)
+        if handler is None and "." in action:
+            # Le contrat de la couche assistant nomme ses actions avec un
+            # point (`assistant.capacites`), ce qui n'est pas un identifiant
+            # Python valide. La méthode s'appelle donc `a_assistant_capacites`
+            # et la traduction se fait ici, en un seul endroit.
+            handler = getattr(self, "a_" + action.replace(".", "_"), None)
         if handler is None or not callable(handler):
             return None
         try:
@@ -369,7 +401,11 @@ class Bridge:
             return err(f"{type(exc).__name__}: {exc}")
 
     def known_actions(self) -> List[str]:
-        return sorted(n[2:] for n in dir(self) if n.startswith("a_") and callable(getattr(self, n)))
+        methodes = {n[2:] for n in dir(self) if n.startswith("a_") and callable(getattr(self, n))}
+        # Les deux écritures sont annoncées : celle du contrat assistant
+        # (pointée) et celle des méthodes. Une interface qui interroge /api
+        # pour savoir ce qui existe doit y retrouver le nom qu'elle appelle.
+        return sorted(methodes | set(ASSISTANT_ACTIONS))
 
     # ═════════════════════════════════════════════════════════════
     #  ACTIONS — une méthode a_<action> par ligne du contrat
@@ -509,6 +545,7 @@ class Bridge:
             # Appel de la VRAIE méthode du contrat, avec un `self` instrumenté :
             # aucune logique de scan n'est réimplémentée ici.
             results = main_mod.AntivirusEngine.scan_directory(proxy, str(path), auto_q)
+            self._noter_dernier_scan(str(path), len(results))
             threats = [r for r in results if r.get("verdict") == "MALVEILLANT"]
             return {
                 "path": str(path),
@@ -519,6 +556,28 @@ class Bridge:
             }
 
         return ok({"job_id": self.jobs.submit("scan_directory", worker)})
+
+    def _noter_dernier_scan(self, chemin: str, fichiers: int) -> None:
+        """Retient la date de la dernière analyse complète.
+
+        Sans cette trace, `assistant/proactive.py` lisait une préférence que
+        personne n'écrivait jamais : il concluait donc « aucune analyse
+        complète n'a encore été faite » à perpétuité, et reproposait une
+        analyse en urgence 2 juste après en avoir terminé une. Le contrat est
+        clair là-dessus — insister est un défaut, pas une vertu — et la seule
+        correction honnête est d'enregistrer le fait, pas d'abaisser
+        l'urgence.
+
+        Silencieuse par construction : une mémoire indisponible ne doit
+        jamais faire échouer une analyse déjà terminée.
+        """
+        try:
+            memoire = self._memoire()
+            memoire.definir_preference("dernier_scan", time.time())
+            memoire.journaliser("scan.dossier",
+                                {"chemin": chemin, "fichiers": int(fichiers)})
+        except (ModuleUnavailable, Exception):
+            pass
 
     # ── Suivi des jobs ───────────────────────────────────────────
     def a_job(self, params: Dict) -> Dict:
@@ -1253,6 +1312,460 @@ class Bridge:
         REMET en place ce qu'une action avait retiré."""
         entry_id = str(self._require(params, "id"))
         return self._v2(self._need("history").annuler(entry_id))
+
+    # ═════════════════════════════════════════════════════════════
+    #  COUCHE ASSISTANT — section 10 du contrat gelé
+    #
+    #  Neuf actions, une seule règle qui les gouverne toutes : comprendre et
+    #  exécuter sont deux étapes séparées par un clic. `assistant.comprendre`
+    #  rend une intention et RIEN d'autre ; c'est ce qui empêche une phrase
+    #  mal formulée de déclencher une purge.
+    #
+    #  Les trois actions qui écrivent (profil, acquittement, autonomie)
+    #  passent par `_guarded()` comme le reste du pont. Aucune ne contourne
+    #  la double validation, aucune ne la duplique.
+    # ═════════════════════════════════════════════════════════════
+
+    def _assistant(self, nom: str):
+        """Importe (une seule fois) un module de la couche assistant.
+
+        Même contrat que `_module()` : un module absent lève
+        `ModuleUnavailable`, que `dispatch()` traduit en réponse
+        `{"ok": false, "unavailable": true}` en HTTP 200.
+        """
+        cle = f"assistant:{nom}"
+        with self._lock:
+            if cle in self._modules:
+                return self._modules[cle]
+            if cle in self._module_errors:
+                raise ModuleUnavailable(self._module_errors[cle])
+
+            chemin = _ASSISTANT_MODULES.get(nom)
+            if chemin is None:
+                raise ModuleUnavailable(f"module assistant inconnu : {nom}")
+            try:
+                mod = importlib.import_module(chemin)
+            except Exception as exc:
+                motif = f"{chemin} indisponible : {type(exc).__name__}: {exc}"
+                self._module_errors[cle] = motif
+                raise ModuleUnavailable(motif) from exc
+            self._modules[cle] = mod
+            return mod
+
+    def _singleton_assistant(self, cle: str, fabrique):
+        """Objets d'état de la couche assistant, partagés par toutes les actions.
+
+        Ils portent de l'état vivant (historique de télémétrie, notifications
+        non acquittées, fil du mode autonome) : en reconstruire un par appel
+        reviendrait à tout oublier à chaque rafraîchissement de la page.
+        Rangés dans `self._instances` pour rester remplaçables par un double
+        dans les tests, exactement comme les modules métier.
+        """
+        with self._lock:
+            if cle in self._instances:
+                return self._instances[cle]
+        objet = fabrique()  # hors verrou : la fabrique peut importer, lire un fichier
+        with self._lock:
+            return self._instances.setdefault(cle, objet)
+
+    def _registre(self):
+        return self._singleton_assistant(
+            "assistant_registre",
+            lambda: self._assistant("registry").construire_registre_par_defaut(),
+        )
+
+    def _memoire(self):
+        return self._singleton_assistant(
+            "assistant_memoire", lambda: self._assistant("memory").Memoire()
+        )
+
+    def _centre(self):
+        return self._singleton_assistant(
+            "assistant_centre", lambda: self._assistant("notify").CentreNotifications()
+        )
+
+    def _telemetrie(self):
+        return self._singleton_assistant(
+            "assistant_telemetrie", lambda: self._assistant("telemetry").Telemetrie()
+        )
+
+    def _autonomie(self):
+        def fabrique():
+            return self._assistant("autonomy").ModeAutonome(
+                self._registre(), self._memoire(), self._centre(),
+                executeur=self._executer_capacite,
+                source_etat=self._etat_assistant,
+            )
+        return self._singleton_assistant("assistant_autonomie", fabrique)
+
+    # ── Exécuteur du mode autonome ───────────────────────────────
+    def _executer_capacite(self, capacite, parametres: Optional[Dict] = None) -> Dict:
+        """Seule voie par laquelle le mode autonome atteint le pont.
+
+        Le filtre de risque est déjà appliqué dans `assistant/autonomy.py`.
+        Il est répété ici parce que c'est ce côté-ci qui exécute réellement :
+        une régression dans la couche assistant ne doit pas suffire à ouvrir
+        la porte, et cette méthode est le dernier verrou avant `dispatch()`.
+        """
+        risk = self._assistant("risk")
+        try:
+            niveau = risk.Risque(int(capacite.risque))
+        except (TypeError, ValueError):
+            return err("niveau de risque illisible : exécution refusée")
+        if niveau != risk.Risque.LECTURE or risk.exige_confirmation(niveau, True):
+            return err(
+                f"« {capacite.nom} » est de niveau {risk.libelle(niveau)} : "
+                f"le mode autonome n'exécute que des capacités de lecture."
+            )
+
+        action = str(getattr(capacite, "action_bridge", "") or "").strip()
+        if not action:
+            return err(f"« {capacite.nom} » est une capacité interne, sans action web.")
+        reponse = self.dispatch(action, dict(parametres or {}))
+        if reponse is None:
+            return err(f"action inconnue du pont : {action}")
+        return reponse
+
+    # ── Représentations JSON ─────────────────────────────────────
+    def _capacite_json(self, capacite) -> Dict:
+        risk = self._assistant("risk")
+        return {
+            "nom": capacite.nom,
+            "titre": capacite.titre,
+            "categorie": capacite.categorie,
+            "risque": int(capacite.risque),
+            "risque_libelle": risk.libelle(capacite.risque),
+            "description": capacite.description,
+            "action_bridge": capacite.action_bridge,
+            "parametres": list(capacite.parametres or ()),
+            # Deux réponses distinctes à deux questions distinctes : ce que
+            # l'interface doit faire confirmer, et ce que le mode autonome a
+            # le droit de lancer seul.
+            "exige_confirmation": bool(risk.exige_confirmation(capacite.risque, False)),
+            "autonome": not bool(risk.exige_confirmation(capacite.risque, True)),
+        }
+
+    def _etat_assistant(self) -> Dict:
+        """L'état de la machine, dans la forme qu'attend `proactive.suggerer`.
+
+        Construit à partir de `status`, déjà tolérant à tous les modules
+        absents : sous Linux, la moitié des clés manquent et les suggestions
+        correspondantes ne sont simplement pas émises. Une clé absente vaut
+        « je ne sais pas » et non « tout va bien » — c'est pourquoi
+        `temps_reel` ou `bouclier` ne sont posés que si `status` a répondu.
+        """
+        statut: Dict = {}
+        try:
+            statut = (self.a_status({}) or {}).get("data") or {}
+        except Exception:
+            statut = {}
+
+        signatures = statut.get("signatures") or {}
+        etat: Dict = {
+            # L'instant vient de l'état et non de `time.time()` côté assistant :
+            # c'est ce qui rend `suggerer()` rejouable à l'identique.
+            "maintenant": time.time(),
+            "plateforme": statut.get("platform"),
+            "administrateur": bool(statut.get("is_admin")),
+            "temps_reel": {"actif": bool(statut.get("realtime_active"))},
+            "bouclier": {"actif": bool(statut.get("shield_active"))},
+            "incident": dict(statut.get("incident") or {}),
+            "quarantaine": {"total": int(statut.get("quarantine_count") or 0)},
+            "sas": {"total": int(statut.get("staging_count") or 0)},
+            "signatures": {
+                "empreintes": int(signatures.get("hashes") or 0),
+                "regles_yara": int(signatures.get("yara_rules") or 0),
+                "derniere_maj": signatures.get("last_update"),
+            },
+        }
+
+        try:
+            memoire = self._memoire()
+            etat["dernier_scan"] = memoire.preference("dernier_scan")
+        except (ModuleUnavailable, Exception):
+            pass
+
+        try:
+            telemetrie = self._telemetrie()
+            echantillon = telemetrie.echantillonner()
+            if telemetrie.disponible:
+                etat["telemetrie"] = {
+                    "cpu": echantillon.cpu,
+                    "memoire": echantillon.memoire,
+                    "disque": echantillon.disque,
+                    "temperature": echantillon.temperature,
+                }
+        except (ModuleUnavailable, Exception):
+            pass
+
+        return etat
+
+    def _suggestions_json(self, etat: Optional[Dict] = None) -> List[Dict]:
+        """Suggestions courantes, enrichies du risque de chaque capacité.
+
+        `etat` est accepté pour que l'appelant puisse RENDRE l'état qui a
+        réellement servi au calcul. Le reconstruire après coup en donnait un
+        autre : `_etat_assistant()` relance `status` et prend un nouvel
+        échantillon de télémétrie à chaque appel, si bien que le motif affiché
+        (« disque occupé à 91 % ») et le chiffre publié à côté pouvaient se
+        contredire. Une suggestion accompagnée d'un fait qui ne la justifie
+        pas est pire qu'une suggestion nue.
+        """
+        proactive = self._assistant("proactive")
+        registre = self._registre()
+        if etat is None:
+            etat = self._etat_assistant()
+        suggestions = proactive.suggerer(etat, self._memoire(), registre)
+        sortie: List[Dict] = []
+        for s in suggestions:
+            entree = {"capacite": s.capacite, "motif": s.motif, "urgence": int(s.urgence)}
+            capacite = registre.obtenir(s.capacite)
+            # L'interface doit pouvoir dire, sans second appel, si cliquer
+            # ouvrira une modale de confirmation ou lancera une lecture.
+            entree["detail"] = self._capacite_json(capacite) if capacite else None
+            sortie.append(entree)
+        return sortie
+
+    # ── 1. Registre des capacités (LECTURE) ──────────────────────
+    def a_assistant_capacites(self, params: Dict) -> Dict:
+        registre = self._registre()
+        categorie = params.get("categorie")
+        if isinstance(categorie, str) and categorie.strip():
+            capacites = registre.par_categorie(categorie.strip())
+        else:
+            capacites = registre.toutes()
+        return ok({
+            "capacites": [self._capacite_json(c) for c in capacites],
+            "categories": list(self._assistant("registry").CATEGORIES),
+            "total": len(registre.toutes()),
+            "filtre": categorie if isinstance(categorie, str) else None,
+        })
+
+    # ── 2. Compréhension d'une phrase (LECTURE — N'EXÉCUTE RIEN) ─
+    def a_assistant_comprendre(self, params: Dict) -> Dict:
+        """Traduit une phrase en intention. **N'exécute jamais la capacité.**
+
+        C'est la garantie centrale de cette section du contrat, et elle est
+        structurelle : cette méthode ne touche ni à `dispatch()`, ni à
+        `_guarded()`, ni à la mémoire. Elle lit le registre et rend une
+        lecture, avec sa justification et son niveau de risque, pour que
+        l'utilisateur décide en connaissance de cause. L'exécution demande un
+        second appel, sur une autre action, déclenché par un autre bouton.
+        """
+        phrase = params.get("phrase", params.get("texte", ""))
+        phrase = str(phrase if phrase is not None else "").strip()
+        if not phrase:
+            return err("Paramètre `phrase` manquant.")
+
+        registre = self._registre()
+        intention = self._assistant("intent").comprendre(phrase, registre)
+        capacite = registre.obtenir(intention.capacite) if intention.capacite else None
+
+        return ok({
+            "phrase": phrase,
+            "capacite": intention.capacite,
+            "parametres": dict(intention.parametres or {}),
+            "confiance": round(float(intention.confiance), 3),
+            "justification": intention.justification,
+            "comprise": bool(intention.capacite),
+            "detail": self._capacite_json(capacite) if capacite else None,
+            # Champ redondant et volontaire : il documente dans la réponse
+            # elle-même qu'aucune action n'a eu lieu.
+            "execute": False,
+        })
+
+    # ── 3. Profil (REVERSIBLE — l'écriture passe par _guarded) ───
+    def a_assistant_profil(self, params: Dict) -> Dict:
+        memoire = self._memoire()
+        champs = {c: params[c] for c in ("nom_assistant", "nom_utilisateur", "langue")
+                  if c in params}
+
+        if not champs:
+            # Lecture pure : aucune raison d'imposer un aller-retour de
+            # confirmation pour afficher un nom.
+            return ok({"profil": dataclasses.asdict(memoire.profil()), "ecrit": False})
+
+        def plan():
+            avant = dataclasses.asdict(memoire.profil())
+            apres = dict(avant)
+            apres.update(champs)
+            modifies = [c for c in champs if str(avant.get(c, "")) != str(apres.get(c, ""))]
+            return {
+                "items": [{"path": c, "reason": f"« {avant.get(c, '')} » → « {apres.get(c, '')} »"}
+                          for c in sorted(champs)],
+                "count": len(champs),
+                "avant": avant,
+                "apres": apres,
+                "modifies": sorted(modifies),
+                "note": "Le profil est un fichier JSON dans vos données utilisateur. "
+                        "Rien d'autre n'est touché.",
+            }
+
+        def execute():
+            return {"profil": dataclasses.asdict(memoire.definir_profil(**champs))}
+
+        return self._guarded("assistant.profil", params, plan, execute)
+
+    # ── 4. Télémétrie (LECTURE) ──────────────────────────────────
+    def a_assistant_telemetrie(self, params: Dict) -> Dict:
+        telemetrie = self._telemetrie()
+        # Chaque lecture échantillonne : l'historique se construit par le
+        # simple fait que l'interface rafraîchit, sans fil supplémentaire.
+        echantillon = telemetrie.echantillonner()
+
+        secondes = params.get("secondes", 300)
+        try:
+            secondes = max(5, min(24 * 3600, int(secondes)))
+        except (TypeError, ValueError):
+            secondes = 300
+
+        limite = params.get("limite", params.get("limit", 120))
+        try:
+            limite = max(1, min(2000, int(limite)))
+        except (TypeError, ValueError):
+            limite = 120
+
+        moyennes = telemetrie.moyennes(secondes)
+        historique = telemetrie.historique()[-limite:]
+        return ok({
+            "disponible": bool(getattr(telemetrie, "disponible", False)),
+            "echantillon": echantillon.to_dict(),
+            "moyennes": moyennes.to_dict() if moyennes is not None else None,
+            "fenetre": secondes,
+            "historique": [e.to_dict() for e in historique],
+        })
+
+    # ── 5. Notifications (LECTURE) ───────────────────────────────
+    def a_assistant_notifications(self, params: Dict) -> Dict:
+        centre = self._centre()
+        seulement = bool(params.get("non_acquittees_seulement",
+                                    params.get("non_acquittees", False)))
+        toutes = centre.lister()
+        return ok({
+            "notifications": [n.to_dict() for n in
+                              (centre.lister(non_acquittees_seulement=True) if seulement else toutes)],
+            "total": len(toutes),
+            "non_acquittees": len(centre.lister(non_acquittees_seulement=True)),
+        })
+
+    # ── 6. Acquittement (REVERSIBLE — passe par _guarded) ────────
+    def a_assistant_acquitter(self, params: Dict) -> Dict:
+        centre = self._centre()
+        identifiant = str(self._require(params, "identifiant"))
+
+        def plan():
+            cible = next((n for n in centre.lister() if n.identifiant == identifiant), None)
+            if cible is None:
+                return {"items": [], "count": 0,
+                        "note": "Aucune notification ne porte cet identifiant."}
+            return {
+                "items": [{"path": cible.titre, "reason": cible.corps}],
+                "count": 1,
+                "notification": cible.to_dict(),
+                "note": "L'alerte reste dans le journal : elle cesse seulement "
+                        "d'être comptée comme non lue.",
+            }
+
+        def execute():
+            return {"acquittee": bool(centre.acquitter(identifiant)),
+                    "identifiant": identifiant}
+
+        return self._guarded("assistant.acquitter", params, plan, execute)
+
+    # ── 7. Suggestions (LECTURE) ─────────────────────────────────
+    def a_assistant_suggestions(self, params: Dict) -> Dict:
+        # Un seul état, calculé une fois, servi au calcul ET rendu à côté :
+        # une suggestion sans le fait qui la motive n'est qu'une injonction,
+        # et une suggestion accompagnée d'un AUTRE fait est un mensonge.
+        etat = self._etat_assistant()
+        suggestions = self._suggestions_json(etat)
+        return ok({
+            "suggestions": suggestions,
+            "total": len(suggestions),
+            "etat": etat,
+        })
+
+    # ── 8. Résumé de la période (LECTURE) ────────────────────────
+    def a_assistant_resume(self, params: Dict) -> Dict:
+        jusqu_a = params.get("jusqu_a", params.get("jusqua"))
+        depuis = params.get("depuis")
+        try:
+            jusqu_a = float(jusqu_a) if jusqu_a is not None else time.time()
+        except (TypeError, ValueError):
+            jusqu_a = time.time()
+        try:
+            depuis = float(depuis) if depuis is not None else jusqu_a - 86400.0
+        except (TypeError, ValueError):
+            depuis = jusqu_a - 86400.0
+
+        # Le résumé n'interroge rien : il agrège ce qui existe déjà. Chaque
+        # source est facultative, et une source absente retire une section du
+        # rapport sans le faire échouer.
+        sources: Dict = {}
+        try:
+            sources["notifications"] = list(self._centre().lister())
+        except (ModuleUnavailable, Exception):
+            pass
+        try:
+            sources["telemetrie"] = list(self._telemetrie().historique())
+        except (ModuleUnavailable, Exception):
+            pass
+        try:
+            sources["decisions"] = self._memoire().decisions(200)
+        except (ModuleUnavailable, Exception):
+            pass
+        try:
+            sources["suggestions"] = self._suggestions_json()
+        except (ModuleUnavailable, Exception):
+            pass
+
+        resume = self._assistant("digest").construire_resume(depuis, jusqu_a, sources)
+        return ok(dict(resume, sources_lues=sorted(sources)))
+
+    # ── 9. Mode autonome (REVERSIBLE — démarrage/arrêt _guarded) ─
+    def a_assistant_autonomie(self, params: Dict) -> Dict:
+        mode = self._autonomie()
+        demande = params.get("etat", params.get("action", "etat"))
+        demande = str(demande if demande is not None else "").strip().lower()
+
+        if demande in ("", "etat", "état", "state", "lire"):
+            # Lire l'état ne modifie rien : pas de cycle de confirmation.
+            return ok(mode.etat())
+
+        if demande in ("demarrer", "démarrer", "start", "activer"):
+            vers_actif = True
+        elif demande in ("arreter", "arrêter", "stop", "desactiver", "désactiver"):
+            vers_actif = False
+        else:
+            return err("Paramètre `etat` attendu : « demarrer », « arreter » ou « etat ».")
+
+        def plan():
+            avant = mode.etat()
+            if vers_actif:
+                resume = (f"ANTI-ZEEVIRIUS surveillera seul, au plus "
+                          f"{avant.get('budget')} action(s) par cycle, et n'exécutera "
+                          f"QUE des capacités de lecture. Tout ce qui écrit sur le "
+                          f"disque vous sera proposé, jamais appliqué.")
+            else:
+                resume = ("La surveillance autonome s'arrête. L'arrêt prend effet "
+                          "avant l'action suivante, sans attendre la fin du cycle.")
+            return {
+                "items": [{"path": "Mode autonome",
+                           "reason": "activation" if vers_actif else "désactivation"}],
+                "count": 1,
+                "avant": avant,
+                "vers": "actif" if vers_actif else "arrêté",
+                "note": resume,
+            }
+
+        def execute():
+            if vers_actif:
+                mode.demarrer()
+            else:
+                mode.arreter()
+            return mode.etat()
+
+        return self._guarded("assistant.autonomie", params, plan, execute)
 
     # ── Utilitaires de validation des paramètres ─────────────────
     @staticmethod

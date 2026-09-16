@@ -1,0 +1,730 @@
+{
+  "journal": [
+    {
+      "detail": {
+        "budget": 12,
+        "horodatage": 1789556959.102053,
+        "intervalle": 300.0,
+        "motif": "mode autonome activé par l'utilisateur",
+        "type": "demarrage"
+      },
+      "evenement": "autonomie.demarrage",
+      "horodatage": 1789556959.1020792
+    },
+    {
+      "detail": {
+        "capacite": "etat.systeme",
+        "etape": "engagee",
+        "horodatage": 1789556959.238052,
+        "motif": "les bases de signatures sont vides : la détection par empreinte ne peut rien trouver",
+        "risque": 0,
+        "titre": "État général du système",
+        "type": "action",
+        "urgence": 2
+      },
+      "evenement": "autonomie.action",
+      "horodatage": 1789556959.2380908
+    },
+    {
+      "detail": {
+        "capacite": "etat.systeme",
+        "duree": 0.0,
+        "etape": "terminee",
+        "horodatage": 1789556959.239551,
+        "ok": true,
+        "type": "resultat"
+      },
+      "evenement": "autonomie.resultat",
+      "horodatage": 1789556959.2395694
+    },
+    {
+      "detail": {
+        "capacite": "scan.dossier",
+        "etape": "engagee",
+        "horodatage": 1789556959.240243,
+        "motif": "aucune analyse complète n'a encore été faite sur cette machine",
+        "risque": 0,
+        "titre": "Analyser un dossier",
+        "type": "action",
+        "urgence": 2
+      },
+      "evenement": "autonomie.action",
+      "horodatage": 1789556959.2402618
+    },
+    {
+      "detail": {
+        "capacite": "scan.dossier",
+        "duree": 0.0,
+        "etape": "terminee",
+        "horodatage": 1789556959.2409096,
+        "ok": false,
+        "type": "resultat"
+      },
+      "evenement": "autonomie.resultat",
+      "horodatage": 1789556959.2409246
+    },
+    {
+      "detail": {
+        "capacite": "temps_reel.demarrer",
+        "horodatage": 1789556959.2416441,
+        "motif": "la surveillance en temps réel des dossiers sensibles est arrêtée",
+        "raison": "niveau supérieur à LECTURE — présentée à l'utilisateur, jamais exécutée",
+        "risque": 1,
+        "titre": "Démarrer la surveillance en temps réel",
+        "type": "suggestion",
+        "urgence": 2
+      },
+      "evenement": "autonomie.suggestion",
+      "horodatage": 1789556959.2416642
+    },
+    {
+      "detail": {
+        "capacite": "bouclier.demarrer",
+        "horodatage": 1789556959.2424698,
+        "motif": "le bouclier anti-rançongiciel (fichiers-appâts) n'est pas déployé",
+        "raison": "niveau supérieur à LECTURE — présentée à l'utilisateur, jamais exécutée",
+        "risque": 1,
+        "titre": "Déployer le bouclier anti-rançongiciel",
+        "type": "suggestion",
+        "urgence": 1
+      },
+      "evenement": "autonomie.suggestion",
+      "horodatage": 1789556959.2424877
+    },
+    {
+      "detail": {
+        "horodatage": 1789556960.106434,
+        "motif": "mode autonome désactivé",
+        "type": "arret"
+      },
+      "evenement": "autonomie.arret",
+      "horodatage": 1789556960.1064591
+    },
+    {
+      "detail": {
+        "budget": 12,
+        "horodatage": 1789557829.3451273,
+        "intervalle": 300.0,
+        "motif": "mode autonome activé par l'utilisateur",
+        "type": "demarrage"
+      },
+      "evenement": "autonomie.demarrage",
+      "horodatage": 1789557829.3451788
+    },
+    {
+      "detail": {
+        "capacite": "etat.systeme",
+        "etape": "engagee",
+        "horodatage": 1789557829.3479555,
+        "motif": "les bases de signatures sont vides : la détection par empreinte ne peut rien trouver",
+        "risque": 0,
+        "titre": "État général du système",
+        "type": "action",
+        "urgence": 2
+      },
+      "evenement": "autonomie.action",
+      "horodatage": 1789557829.3479788
+    },
+    {
+      "detail": {
+        "capacite": "etat.systeme",
+        "duree": 0.0,
+        "etape": "terminee",
+        "horodatage": 1789557829.3491483,
+        "ok": true,
+        "type": "resultat"
+      },
+      "evenement": "autonomie.resultat",
+      "horodatage": 1789557829.349165
+    },
+    {
+      "detail": {
+        "capacite": "scan.dossier",
+        "etape": "engagee",
+        "horodatage": 1789557829.3499315,
+        "motif": "aucune analyse complète n'a encore été faite sur cette machine",
+        "risque": 0,
+        "titre": "Analyser un dossier",
+        "type": "action",
+        "urgence": 2
+      },
+      "evenement": "autonomie.action",
+      "horodatage": 1789557829.3499522
+    },
+    {
+      "detail": {
+        "capacite": "scan.dossier",
+        "duree": 0.0,
+        "etape": "terminee",
+        "horodatage": 1789557829.3507497,
+        "ok": false,
+        "type": "resultat"
+      },
+      "evenement": "autonomie.resultat",
+      "horodatage": 1789557829.3507645
+    },
+    {
+      "detail": {
+        "capacite": "temps_reel.demarrer",
+        "horodatage": 1789557829.3514638,
+        "motif": "la surveillance en temps réel des dossiers sensibles est arrêtée",
+        "raison": "niveau supérieur à LECTURE — présentée à l'utilisateur, jamais exécutée",
+        "risque": 1,
+        "titre": "Démarrer la surveillance en temps réel",
+        "type": "suggestion",
+        "urgence": 2
+      },
+      "evenement": "autonomie.suggestion",
+      "horodatage": 1789557829.3514817
+    },
+    {
+      "detail": {
+        "capacite": "bouclier.demarrer",
+        "horodatage": 1789557829.3522694,
+        "motif": "le bouclier anti-rançongiciel (fichiers-appâts) n'est pas déployé",
+        "raison": "niveau supérieur à LECTURE — présentée à l'utilisateur, jamais exécutée",
+        "risque": 1,
+        "titre": "Déployer le bouclier anti-rançongiciel",
+        "type": "suggestion",
+        "urgence": 1
+      },
+      "evenement": "autonomie.suggestion",
+      "horodatage": 1789557829.3522847
+    },
+    {
+      "detail": {
+        "horodatage": 1789557832.6760402,
+        "motif": "mode autonome désactivé",
+        "type": "arret"
+      },
+      "evenement": "autonomie.arret",
+      "horodatage": 1789557832.6760664
+    },
+    {
+      "detail": {
+        "budget": 12,
+        "horodatage": 1789558086.6637483,
+        "intervalle": 300.0,
+        "motif": "mode autonome activé par l'utilisateur",
+        "type": "demarrage"
+      },
+      "evenement": "autonomie.demarrage",
+      "horodatage": 1789558086.6637738
+    },
+    {
+      "detail": {
+        "horodatage": 1789558086.667187,
+        "motif": "arrêt demandé — cycle abandonné avant l'action suivante",
+        "type": "interruption"
+      },
+      "evenement": "autonomie.interruption",
+      "horodatage": 1789558086.6672082
+    },
+    {
+      "detail": {
+        "horodatage": 1789558086.6683238,
+        "motif": "mode autonome désactivé",
+        "type": "arret"
+      },
+      "evenement": "autonomie.arret",
+      "horodatage": 1789558086.6683455
+    },
+    {
+      "detail": {
+        "budget": 12,
+        "horodatage": 1789558104.7221346,
+        "intervalle": 300.0,
+        "motif": "mode autonome activé par l'utilisateur",
+        "type": "demarrage"
+      },
+      "evenement": "autonomie.demarrage",
+      "horodatage": 1789558104.7221537
+    },
+    {
+      "detail": {
+        "horodatage": 1789558104.7260797,
+        "motif": "arrêt demandé — cycle abandonné avant l'action suivante",
+        "type": "interruption"
+      },
+      "evenement": "autonomie.interruption",
+      "horodatage": 1789558104.7260973
+    },
+    {
+      "detail": {
+        "horodatage": 1789558104.7272186,
+        "motif": "mode autonome désactivé",
+        "type": "arret"
+      },
+      "evenement": "autonomie.arret",
+      "horodatage": 1789558104.7272348
+    },
+    {
+      "detail": {
+        "budget": 12,
+        "horodatage": 1789558113.6547031,
+        "intervalle": 300.0,
+        "motif": "mode autonome activé par l'utilisateur",
+        "type": "demarrage"
+      },
+      "evenement": "autonomie.demarrage",
+      "horodatage": 1789558113.6547215
+    },
+    {
+      "detail": {
+        "horodatage": 1789558113.6571815,
+        "motif": "arrêt demandé — cycle abandonné avant l'action suivante",
+        "type": "interruption"
+      },
+      "evenement": "autonomie.interruption",
+      "horodatage": 1789558113.6571975
+    },
+    {
+      "detail": {
+        "horodatage": 1789558113.658367,
+        "motif": "mode autonome désactivé",
+        "type": "arret"
+      },
+      "evenement": "autonomie.arret",
+      "horodatage": 1789558113.658409
+    },
+    {
+      "detail": {
+        "budget": 12,
+        "horodatage": 1789558124.7595038,
+        "intervalle": 300.0,
+        "motif": "mode autonome activé par l'utilisateur",
+        "type": "demarrage"
+      },
+      "evenement": "autonomie.demarrage",
+      "horodatage": 1789558124.7595255
+    },
+    {
+      "detail": {
+        "horodatage": 1789558124.7639222,
+        "motif": "arrêt demandé — cycle abandonné avant l'action suivante",
+        "type": "interruption"
+      },
+      "evenement": "autonomie.interruption",
+      "horodatage": 1789558124.7639456
+    },
+    {
+      "detail": {
+        "horodatage": 1789558124.7652755,
+        "motif": "mode autonome désactivé",
+        "type": "arret"
+      },
+      "evenement": "autonomie.arret",
+      "horodatage": 1789558124.7652998
+    },
+    {
+      "detail": {
+        "budget": 12,
+        "horodatage": 1789558146.8221285,
+        "intervalle": 300.0,
+        "motif": "mode autonome activé par l'utilisateur",
+        "type": "demarrage"
+      },
+      "evenement": "autonomie.demarrage",
+      "horodatage": 1789558146.822156
+    },
+    {
+      "detail": {
+        "capacite": "etat.systeme",
+        "etape": "engagee",
+        "horodatage": 1789558146.8254642,
+        "motif": "les bases de signatures sont vides : la détection par empreinte ne peut rien trouver",
+        "risque": 0,
+        "titre": "État général du système",
+        "type": "action",
+        "urgence": 2
+      },
+      "evenement": "autonomie.action",
+      "horodatage": 1789558146.8254914
+    },
+    {
+      "detail": {
+        "capacite": "etat.systeme",
+        "duree": 0.0,
+        "etape": "terminee",
+        "horodatage": 1789558146.828411,
+        "ok": true,
+        "type": "resultat"
+      },
+      "evenement": "autonomie.resultat",
+      "horodatage": 1789558146.8284316
+    },
+    {
+      "detail": {
+        "capacite": "scan.dossier",
+        "etape": "engagee",
+        "horodatage": 1789558146.829525,
+        "motif": "aucune analyse complète n'a encore été faite sur cette machine",
+        "risque": 0,
+        "titre": "Analyser un dossier",
+        "type": "action",
+        "urgence": 2
+      },
+      "evenement": "autonomie.action",
+      "horodatage": 1789558146.8295465
+    },
+    {
+      "detail": {
+        "capacite": "scan.dossier",
+        "duree": 0.0,
+        "etape": "terminee",
+        "horodatage": 1789558146.830623,
+        "ok": false,
+        "type": "resultat"
+      },
+      "evenement": "autonomie.resultat",
+      "horodatage": 1789558146.8306391
+    },
+    {
+      "detail": {
+        "capacite": "temps_reel.demarrer",
+        "horodatage": 1789558146.8316267,
+        "motif": "la surveillance en temps réel des dossiers sensibles est arrêtée",
+        "raison": "niveau supérieur à LECTURE — présentée à l'utilisateur, jamais exécutée",
+        "risque": 1,
+        "titre": "Démarrer la surveillance en temps réel",
+        "type": "suggestion",
+        "urgence": 2
+      },
+      "evenement": "autonomie.suggestion",
+      "horodatage": 1789558146.8316462
+    },
+    {
+      "detail": {
+        "capacite": "bouclier.demarrer",
+        "horodatage": 1789558146.8326766,
+        "motif": "le bouclier anti-rançongiciel (fichiers-appâts) n'est pas déployé",
+        "raison": "niveau supérieur à LECTURE — présentée à l'utilisateur, jamais exécutée",
+        "risque": 1,
+        "titre": "Déployer le bouclier anti-rançongiciel",
+        "type": "suggestion",
+        "urgence": 1
+      },
+      "evenement": "autonomie.suggestion",
+      "horodatage": 1789558146.8326938
+    },
+    {
+      "detail": {
+        "horodatage": 1789558150.1797712,
+        "motif": "mode autonome désactivé",
+        "type": "arret"
+      },
+      "evenement": "autonomie.arret",
+      "horodatage": 1789558150.1798055
+    },
+    {
+      "detail": {
+        "budget": 12,
+        "horodatage": 1789558164.7530193,
+        "intervalle": 300.0,
+        "motif": "mode autonome activé par l'utilisateur",
+        "type": "demarrage"
+      },
+      "evenement": "autonomie.demarrage",
+      "horodatage": 1789558164.7530425
+    },
+    {
+      "detail": {
+        "horodatage": 1789558164.7584968,
+        "motif": "arrêt demandé — cycle abandonné avant l'action suivante",
+        "type": "interruption"
+      },
+      "evenement": "autonomie.interruption",
+      "horodatage": 1789558164.7585194
+    },
+    {
+      "detail": {
+        "horodatage": 1789558164.7600064,
+        "motif": "mode autonome désactivé",
+        "type": "arret"
+      },
+      "evenement": "autonomie.arret",
+      "horodatage": 1789558164.7600317
+    },
+    {
+      "detail": {
+        "budget": 12,
+        "horodatage": 1789558185.9132016,
+        "intervalle": 300.0,
+        "motif": "mode autonome activé par l'utilisateur",
+        "type": "demarrage"
+      },
+      "evenement": "autonomie.demarrage",
+      "horodatage": 1789558185.913687
+    },
+    {
+      "detail": {
+        "capacite": "etat.systeme",
+        "etape": "engagee",
+        "horodatage": 1789558185.9166327,
+        "motif": "les bases de signatures sont vides : la détection par empreinte ne peut rien trouver",
+        "risque": 0,
+        "titre": "État général du système",
+        "type": "action",
+        "urgence": 2
+      },
+      "evenement": "autonomie.action",
+      "horodatage": 1789558185.9166553
+    },
+    {
+      "detail": {
+        "capacite": "etat.systeme",
+        "duree": 0.0,
+        "etape": "terminee",
+        "horodatage": 1789558185.9185376,
+        "ok": true,
+        "type": "resultat"
+      },
+      "evenement": "autonomie.resultat",
+      "horodatage": 1789558185.918553
+    },
+    {
+      "detail": {
+        "capacite": "scan.dossier",
+        "etape": "engagee",
+        "horodatage": 1789558185.9199364,
+        "motif": "aucune analyse complète n'a encore été faite sur cette machine",
+        "risque": 0,
+        "titre": "Analyser un dossier",
+        "type": "action",
+        "urgence": 2
+      },
+      "evenement": "autonomie.action",
+      "horodatage": 1789558185.9199784
+    },
+    {
+      "detail": {
+        "capacite": "scan.dossier",
+        "duree": 0.0,
+        "etape": "terminee",
+        "horodatage": 1789558185.9218788,
+        "ok": false,
+        "type": "resultat"
+      },
+      "evenement": "autonomie.resultat",
+      "horodatage": 1789558185.9218988
+    },
+    {
+      "detail": {
+        "capacite": "temps_reel.demarrer",
+        "horodatage": 1789558185.9232292,
+        "motif": "la surveillance en temps réel des dossiers sensibles est arrêtée",
+        "raison": "niveau supérieur à LECTURE — présentée à l'utilisateur, jamais exécutée",
+        "risque": 1,
+        "titre": "Démarrer la surveillance en temps réel",
+        "type": "suggestion",
+        "urgence": 2
+      },
+      "evenement": "autonomie.suggestion",
+      "horodatage": 1789558185.9232502
+    },
+    {
+      "detail": {
+        "capacite": "bouclier.demarrer",
+        "horodatage": 1789558185.9245532,
+        "motif": "le bouclier anti-rançongiciel (fichiers-appâts) n'est pas déployé",
+        "raison": "niveau supérieur à LECTURE — présentée à l'utilisateur, jamais exécutée",
+        "risque": 1,
+        "titre": "Déployer le bouclier anti-rançongiciel",
+        "type": "suggestion",
+        "urgence": 1
+      },
+      "evenement": "autonomie.suggestion",
+      "horodatage": 1789558185.924572
+    },
+    {
+      "detail": {
+        "horodatage": 1789558189.3497667,
+        "motif": "mode autonome désactivé",
+        "type": "arret"
+      },
+      "evenement": "autonomie.arret",
+      "horodatage": 1789558189.349797
+    },
+    {
+      "detail": {
+        "budget": 12,
+        "horodatage": 1789563743.730275,
+        "intervalle": 300.0,
+        "motif": "mode autonome activé par l'utilisateur",
+        "type": "demarrage"
+      },
+      "evenement": "autonomie.demarrage",
+      "horodatage": 1789563743.7302916
+    },
+    {
+      "detail": {
+        "horodatage": 1789563743.7338035,
+        "motif": "arrêt demandé — cycle abandonné avant l'action suivante",
+        "type": "interruption"
+      },
+      "evenement": "autonomie.interruption",
+      "horodatage": 1789563743.7338252
+    },
+    {
+      "detail": {
+        "horodatage": 1789563743.7353883,
+        "motif": "mode autonome désactivé",
+        "type": "arret"
+      },
+      "evenement": "autonomie.arret",
+      "horodatage": 1789563743.7354202
+    },
+    {
+      "detail": {
+        "budget": 12,
+        "horodatage": 1789564475.0500517,
+        "intervalle": 300.0,
+        "motif": "mode autonome activé par l'utilisateur",
+        "type": "demarrage"
+      },
+      "evenement": "autonomie.demarrage",
+      "horodatage": 1789564475.0500731
+    },
+    {
+      "detail": {
+        "horodatage": 1789564475.057232,
+        "motif": "arrêt demandé — cycle abandonné avant l'action suivante",
+        "type": "interruption"
+      },
+      "evenement": "autonomie.interruption",
+      "horodatage": 1789564475.0572557
+    },
+    {
+      "detail": {
+        "horodatage": 1789564475.0585952,
+        "motif": "mode autonome désactivé",
+        "type": "arret"
+      },
+      "evenement": "autonomie.arret",
+      "horodatage": 1789564475.0586147
+    },
+    {
+      "detail": {
+        "budget": 12,
+        "horodatage": 1789564491.4284434,
+        "intervalle": 300.0,
+        "motif": "mode autonome activé par l'utilisateur",
+        "type": "demarrage"
+      },
+      "evenement": "autonomie.demarrage",
+      "horodatage": 1789564491.4286613
+    },
+    {
+      "detail": {
+        "horodatage": 1789564491.4330993,
+        "motif": "arrêt demandé — cycle abandonné avant l'action suivante",
+        "type": "interruption"
+      },
+      "evenement": "autonomie.interruption",
+      "horodatage": 1789564491.4331205
+    },
+    {
+      "detail": {
+        "horodatage": 1789564491.4346454,
+        "motif": "mode autonome désactivé",
+        "type": "arret"
+      },
+      "evenement": "autonomie.arret",
+      "horodatage": 1789564491.4346793
+    },
+    {
+      "detail": {
+        "budget": 12,
+        "horodatage": 1789564507.1364353,
+        "intervalle": 300.0,
+        "motif": "mode autonome activé par l'utilisateur",
+        "type": "demarrage"
+      },
+      "evenement": "autonomie.demarrage",
+      "horodatage": 1789564507.1364644
+    },
+    {
+      "detail": {
+        "horodatage": 1789564507.2484703,
+        "motif": "arrêt demandé — cycle abandonné avant l'action suivante",
+        "type": "interruption"
+      },
+      "evenement": "autonomie.interruption",
+      "horodatage": 1789564507.2485375
+    },
+    {
+      "detail": {
+        "horodatage": 1789564507.2502363,
+        "motif": "mode autonome désactivé",
+        "type": "arret"
+      },
+      "evenement": "autonomie.arret",
+      "horodatage": 1789564507.2502608
+    },
+    {
+      "detail": {
+        "budget": 12,
+        "horodatage": 1789564523.4794185,
+        "intervalle": 300.0,
+        "motif": "mode autonome activé par l'utilisateur",
+        "type": "demarrage"
+      },
+      "evenement": "autonomie.demarrage",
+      "horodatage": 1789564523.4794486
+    },
+    {
+      "detail": {
+        "horodatage": 1789564523.4843943,
+        "motif": "arrêt demandé — cycle abandonné avant l'action suivante",
+        "type": "interruption"
+      },
+      "evenement": "autonomie.interruption",
+      "horodatage": 1789564523.4844573
+    },
+    {
+      "detail": {
+        "horodatage": 1789564523.4860976,
+        "motif": "mode autonome désactivé",
+        "type": "arret"
+      },
+      "evenement": "autonomie.arret",
+      "horodatage": 1789564523.4861317
+    },
+    {
+      "detail": {
+        "budget": 12,
+        "horodatage": 1789564539.1758614,
+        "intervalle": 300.0,
+        "motif": "mode autonome activé par l'utilisateur",
+        "type": "demarrage"
+      },
+      "evenement": "autonomie.demarrage",
+      "horodatage": 1789564539.175878
+    },
+    {
+      "detail": {
+        "horodatage": 1789564539.1808746,
+        "motif": "arrêt demandé — cycle abandonné avant l'action suivante",
+        "type": "interruption"
+      },
+      "evenement": "autonomie.interruption",
+      "horodatage": 1789564539.18091
+    },
+    {
+      "detail": {
+        "horodatage": 1789564539.1825519,
+        "motif": "mode autonome désactivé",
+        "type": "arret"
+      },
+      "evenement": "autonomie.arret",
+      "horodatage": 1789564539.182573
+    }
+  ],
+  "preferences": {},
+  "profil": {
+    "langue": "fr",
+    "nom_assistant": "ANTI-ZEEVIRIUS",
+    "nom_utilisateur": ""
+  },
+  "version": 1
+}

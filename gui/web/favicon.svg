@@ -1,65 +1,182 @@
-<!-- Icône d'onglet. Elle reprend TRAIT POUR TRAIT la géométrie du symbole
-     `blackhole` de index.html (même viewBox 240, mêmes coordonnées) : une
-     marque qui diverge entre l'onglet et l'en-tête n'est plus une marque.
-     Seuls diffèrent le fond arrondi — un favicon est vu sur fond de barre
-     d'onglets, clair ou sombre, et doit porter le sien — et l'absence des
-     tracés d'animation, inutiles sur une image statique de 16 pixels. -->
+<!-- Icone d'onglet. Elle reprend TRAIT POUR TRAIT la geometrie du symbole
+     `blackhole` de gui/web/index.html : memes coordonnees, memes degrades, meme
+     viewBox 240. Une marque qui diverge entre l'onglet et l'en-tete n'est plus
+     une marque. Seuls different le fond arrondi — un favicon est vu sur une
+     barre d'onglets claire ou sombre, il doit porter le sien — et l'absence des
+     traces d'animation, inutiles sur une image statique de 16 pixels.
+     TOUTE retouche du symbole doit etre reportee ici. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="64" height="64">
   <defs>
-    <radialGradient id="fHalo" cx="50%" cy="54%" r="52%">
-      <stop offset="0%"   stop-color="#ffb257" stop-opacity=".34"/>
-      <stop offset="30%"  stop-color="#ff7a17" stop-opacity=".22"/>
-      <stop offset="62%"  stop-color="#c2410c" stop-opacity=".12"/>
+    <!-- Halo : DECENTRE vers la gauche. Sur la reference, le voile chaud n'est
+         pas concentrique — il suit le cote lumineux du disque. -->
+    <radialGradient id="fHalo" cx="43%" cy="52%" r="56%">
+      <stop offset="0%"   stop-color="#ffbe6a" stop-opacity=".20"/>
+      <stop offset="34%"  stop-color="#ff8420" stop-opacity=".12"/>
+      <stop offset="66%"  stop-color="#c2410c" stop-opacity=".05"/>
       <stop offset="100%" stop-color="#7a2408" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="fWing" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%"   stop-color="#b8420c" stop-opacity=".55"/>
-      <stop offset="16%"  stop-color="#f08324" stop-opacity=".92"/>
-      <stop offset="38%"  stop-color="#ffd79a" stop-opacity="1"/>
-      <stop offset="50%"  stop-color="#fffdf6" stop-opacity="1"/>
-      <stop offset="62%"  stop-color="#ffd79a" stop-opacity="1"/>
-      <stop offset="84%"  stop-color="#ef7f20" stop-opacity=".92"/>
-      <stop offset="100%" stop-color="#a8380a" stop-opacity=".55"/>
+
+    <!-- LE DISQUE, en un seul degrade traversant. Le point le plus chaud est a
+         42 % de la largeur, donc A GAUCHE du centre : c'est le cote qui vient
+         vers l'observateur, rendu bien plus lumineux par le decalage Doppler
+         relativiste. Mesure relevee sur la reference : masse lumineuse
+         gauche/droite = 1,13, et colonne la plus brillante a 40 % de la largeur.
+         Un degrade symetrique donne un anneau de Saturne — c'est exactement ce
+         qui rendait les versions precedentes meconnaissables. -->
+    <linearGradient id="fDisk" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#8a3410" stop-opacity="0"/>
+      <stop offset="10%"  stop-color="#e07a22" stop-opacity=".55"/>
+      <stop offset="26%"  stop-color="#ffc888" stop-opacity=".92"/>
+      <stop offset="42%"  stop-color="#fffaf0" stop-opacity="1"/>
+      <stop offset="55%"  stop-color="#fff0d4" stop-opacity="1"/>
+      <stop offset="70%"  stop-color="#f5a44a" stop-opacity=".90"/>
+      <stop offset="86%"  stop-color="#c9541a" stop-opacity=".55"/>
+      <stop offset="100%" stop-color="#6d2606" stop-opacity="0"/>
     </linearGradient>
-    <linearGradient id="fArc" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%"   stop-color="#a8380a" stop-opacity=".45"/>
-      <stop offset="20%"  stop-color="#f4902c" stop-opacity=".92"/>
-      <stop offset="50%"  stop-color="#fff6e2" stop-opacity="1"/>
-      <stop offset="80%"  stop-color="#f08324" stop-opacity=".92"/>
-      <stop offset="100%" stop-color="#a8380a" stop-opacity=".45"/>
+
+    <!-- Brins fins : les filaments de matiere. La reference ne montre pas un
+         degrade lisse mais des stries. -->
+    <linearGradient id="fStrand" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="30%"  stop-color="#fff6e6" stop-opacity=".75"/>
+      <stop offset="52%"  stop-color="#ffffff" stop-opacity=".95"/>
+      <stop offset="74%"  stop-color="#ffd7a2" stop-opacity=".55"/>
+      <stop offset="100%" stop-color="#e8934a" stop-opacity="0"/>
     </linearGradient>
+
+    <!-- L'ANNEAU DE PHOTONS : il encercle la sphere ENTIEREMENT, il ne s'arrete
+         pas en bande. Le plus vif en bas a gauche, tenu en haut a droite. -->
+    <linearGradient id="fRing" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="32%"  stop-color="#fff8ea" stop-opacity=".92"/>
+      <stop offset="66%"  stop-color="#ffe9c4" stop-opacity=".82"/>
+      <stop offset="100%" stop-color="#ffc98a" stop-opacity=".62"/>
+    </linearGradient>
+
+    <!-- LA BANDE lensee qui traverse la sphere a son tiers inferieur. -->
     <linearGradient id="fBand" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%"   stop-color="#ffcf92" stop-opacity=".75"/>
-      <stop offset="28%"  stop-color="#fffefb" stop-opacity="1"/>
-      <stop offset="72%"  stop-color="#fffdf6" stop-opacity="1"/>
-      <stop offset="100%" stop-color="#ffcf92" stop-opacity=".75"/>
+      <stop offset="0%"   stop-color="#ffcf92" stop-opacity=".55"/>
+      <stop offset="26%"  stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="62%"  stop-color="#fffdf6" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#ffbe72" stop-opacity=".45"/>
     </linearGradient>
-    <clipPath id="fSphere"><circle cx="120" cy="118" r="44"/></clipPath>
+
+    <linearGradient id="fHot" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#ffd9a0" stop-opacity="0"/>
+      <stop offset="45%"  stop-color="#fffaf0" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#ffd9a0" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- L'interieur de la sphere n'est PAS noir pur. La reference y montre une
+         luminance olive tres faible, plus claire vers le haut-gauche : c'est
+         l'image de l'arriere du disque, ramenee la par la courbure. Du noir pur
+         donne un trou de decoupe, pas un horizon. -->
+    <radialGradient id="fCore" cx="40%" cy="36%" r="64%">
+      <stop offset="0%"   stop-color="#23251b"/>
+      <stop offset="48%"  stop-color="#0c0d09"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </radialGradient>
+
+    <clipPath id="fSphere"><circle cx="120" cy="116" r="38"/></clipPath>
     <filter id="fSoft" x="-45%" y="-160%" width="190%" height="420%">
       <feGaussianBlur stdDeviation="2.2"/>
     </filter>
+    <filter id="fWide" x="-60%" y="-200%" width="220%" height="500%">
+      <feGaussianBlur stdDeviation="5.5"/>
+    </filter>
+    <clipPath id="fCadre"><rect width="240" height="240" rx="52"/></clipPath>
   </defs>
-
   <rect width="240" height="240" rx="52" fill="#08050a"/>
-  <ellipse cx="120" cy="122" rx="119" ry="86" fill="url(#fHalo)"/>
+  <g clip-path="url(#fCadre)">
+    <!-- LA MARQUE — d'apres docs/identite/reference-trou-noir.png (normative).
+         Echelle : rayon de sphere 75 px sur la photo -> 38 unites ici.
 
-  <path d="M5 135.5 C 42 120, 76 122, 105 129 L 135 129 C 164 122, 198 120, 235 135.5
-           C 198 142, 164 138, 135 133 L 105 133 C 76 138, 42 142, 5 135.5 Z"
-        fill="url(#fWing)"/>
-  <path d="M26 132 A 96 62 0 0 1 214 132" fill="none" stroke="url(#fArc)"
-        stroke-width="13" stroke-linecap="round" filter="url(#fSoft)"/>
-  <path d="M26 132 A 96 62 0 0 1 214 132" fill="none" stroke="#fff8e8"
-        stroke-width="2.4" stroke-linecap="round" opacity=".5"/>
+         TROIS ERREURS CORRIGEES, dans l'ordre ou elles ont ete trouvees en
+         comparant le rendu a la photo :
 
-  <circle cx="120" cy="118" r="44" fill="#000000"/>
-  <g clip-path="url(#fSphere)">
-    <path d="M48 126 Q 120 140, 192 126" fill="none" stroke="url(#fBand)"
-          stroke-width="19" opacity=".4" filter="url(#fSoft)"/>
-    <path d="M48 126 Q 120 140, 192 126" fill="none" stroke="url(#fBand)"
-          stroke-width="9" opacity=".92" filter="url(#fSoft)"/>
-    <path d="M48 126 Q 120 140, 192 126" fill="none" stroke="#fffefa"
-          stroke-width="3.4" opacity=".95"/>
+         1. Des ellipses concentriques donnent SATURNE. La reference n'a aucun
+            anneau : elle a une face avant, une face arriere, et l'anneau de
+            photons. Rien d'autre.
+         2. La face avant est UN SEUL RUBAN CONTINU. Dessiner un panache a
+            gauche et un filet a droite, chacun a sa hauteur, produit deux
+            rubans qui se telescopent au bord de la sphere. Ici un unique trace
+            part de la pointe gauche, passe DEVANT la sphere et ressort a
+            droite : c'est la continuite qui fait lire une orbite.
+         3. Le ruban est ASYMETRIQUE. Large et blanc a gauche — le cote qui
+            vient vers l'observateur, amplifie par le decalage Doppler — il
+            s'affine et vire a l'ambre a droite en remontant. Un ruban
+            symetrique se lit comme un anneau, quel que soit son galbe. -->
+
+    <g><ellipse cx="102" cy="132" rx="88" ry="50" fill="url(#fHalo)"/></g>
+    <g>
+      <circle cx="26" cy="34" r=".9"/><circle cx="214" cy="42" r="1"/>
+      <circle cx="202" cy="200" r=".8"/><circle cx="32" cy="204" r="1"/>
+      <circle cx="122" cy="14" r=".7"/><circle cx="12" cy="150" r=".8"/>
+      <circle cx="228" cy="124" r=".7"/><circle cx="68" cy="24" r=".7"/>
+    </g>
+
+    <!-- ── FACE ARRIERE : l'arc lense au-dessus de la sphere. Fin et pres
+         d'elle : sur la reference il effleure l'horizon, il ne l'enjambe pas
+         en pont. -->
+    <g>
+      <path d="M74 128 C 78 92, 104 64, 132 66 C 164 69, 186 88, 204 110"
+            fill="none" stroke="url(#fDisk)" stroke-width="12" opacity=".26"
+            filter="url(#fWide)"/>
+      <path d="M74 128 C 78 92, 104 64, 132 66 C 164 69, 186 88, 204 110"
+            fill="none" stroke="url(#fDisk)" stroke-width="4.6"
+            stroke-linecap="round"/>
+      <path
+            d="M79 127 C 83 97, 106 72, 131 74 C 159 77, 180 93, 197 112"
+            fill="none" stroke="url(#fStrand)" stroke-width="1.4" opacity=".55"/>
+      <path
+            d="M74 128 C 78 92, 104 64, 132 66 C 164 69, 186 88, 204 110"
+            fill="none" stroke="url(#fHot)" stroke-width="2.6" stroke-linecap="round"
+            stroke-dasharray="20 240" opacity=".8"/>
+    </g>
+
+    <!-- ── LA SPHERE ─────────────────────────────────────────────────────── -->
+    <circle cx="120" cy="116" r="38" fill="url(#fCore)"/>
+
+    <!-- Anneau de photons : COMPLET, lumineux sur tout son tour. C'est le
+         trait le plus net de la reference ; sans lui la sphere n'est qu'un
+         disque decoupe dans le fond. -->
+    <circle cx="120" cy="116" r="40.6" fill="none" stroke="url(#fRing)"
+            stroke-width="5" opacity=".34" filter="url(#fSoft)"/>
+    <circle cx="120" cy="116" r="38.8" fill="none"
+            stroke="url(#fRing)" stroke-width="2.4"/>
+
+    <!-- ── FACE AVANT : le ruban continu, trace APRES la sphere donc devant.
+         Large de 20 unites a la pointe gauche, 13 devant la sphere, 6 a la
+         pointe droite. -->
+    <g>
+      <path
+            d="M6 147 C 36 141, 76 131, 120 127 C 166 123, 202 116, 234 109
+               C 202 130, 164 141, 120 146 C 78 151, 36 164, 6 147 Z"
+            fill="url(#fDisk)" opacity=".38" filter="url(#fWide)"/>
+      <path d="M8 148 C 38 142, 76 133, 120 129 C 165 125, 201 118, 232 111
+               C 201 128, 163 139, 120 144 C 79 149, 38 162, 8 148 Z"
+            fill="url(#fDisk)"/>
+      <!-- Brins : la matiere est filamenteuse, pas un ruban imprime. -->
+      <path d="M18 150 C 46 145, 80 137, 120 133 C 160 129, 196 122, 226 115"
+            fill="none" stroke="url(#fStrand)" stroke-width="1.5" opacity=".65"/>
+      <path d="M20 155 C 50 151, 84 143, 120 138 C 156 133, 192 126, 220 119"
+            fill="none" stroke="url(#fStrand)" stroke-width="1" opacity=".42"/>
+
+      <!-- Le ruban est le plus incandescent la ou il passe devant l'horizon :
+           on rehausse ce seul segment, decoupe au disque de la sphere. -->
+      <g clip-path="url(#fSphere)">
+        <path d="M74 142 Q 120 137, 170 130" fill="none" stroke="url(#fBand)"
+              stroke-width="14" opacity=".32" filter="url(#fSoft)"/>
+        <path d="M74 141 Q 120 136, 170 130" fill="none" stroke="url(#fBand)"
+              stroke-width="6.5" opacity=".85" filter="url(#fSoft)"/>
+        <path d="M74 141 Q 120 136, 170 129" fill="none"
+              stroke="#fffefa" stroke-width="2.4" opacity=".95"/>
+      </g>
+
+      <path
+            d="M10 152 C 40 147, 76 138, 120 134 C 164 130, 200 122, 230 114"
+            fill="none" stroke="url(#fHot)" stroke-width="3.4" stroke-linecap="round"
+            stroke-dasharray="24 290" opacity=".85"/>
+    </g>
   </g>
-  <circle cx="120" cy="118" r="44.5" fill="none" stroke="#ffcf92"
-          stroke-width=".9" opacity=".3"/>
 </svg>

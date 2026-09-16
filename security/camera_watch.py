@@ -41,7 +41,6 @@ pour distinguer l'autorisé de l'inattendu, pas pour crier au loup.
 from __future__ import annotations
 
 import json
-import subprocess
 import threading
 import time
 from dataclasses import dataclass, asdict
@@ -49,6 +48,10 @@ from datetime import datetime, timedelta
 from typing import Callable, Dict, List, Optional, Sequence
 
 import paths
+# La bulle Windows et le lancement de commande vivent désormais dans la couche
+# assistant : ce module les CONSOMME, il ne les possède plus. Un seul endroit
+# sait échapper les apostrophes pour PowerShell, et c'est là-bas.
+from assistant.notify import envoyer_bulle, executer_commande as _executer
 
 __all__ = ["CameraWatch", "Acces", "APPAREILS", "FILETIME_EPOCH"]
 
@@ -90,20 +93,6 @@ def _nom_lisible(cle: str) -> str:
     if "_" in chemin:
         return chemin.split("_", 1)[0]           # Microsoft.Teams_8wek… → Microsoft.Teams
     return chemin
-
-
-def _executer(commande: Sequence[str], timeout: int = 45) -> Dict:
-    try:
-        p = subprocess.run(list(commande), capture_output=True, text=True,
-                           timeout=timeout, shell=False)
-        return {"code": p.returncode, "sortie": p.stdout or "",
-                "erreur": p.stderr or ""}
-    except FileNotFoundError:
-        return {"code": -1, "sortie": "", "erreur": "commande introuvable"}
-    except subprocess.TimeoutExpired:
-        return {"code": -2, "sortie": "", "erreur": "délai dépassé"}
-    except OSError as e:                              # pragma: no cover
-        return {"code": -3, "sortie": "", "erreur": str(e)}
 
 
 @dataclass
@@ -293,38 +282,11 @@ class CameraWatch:
     def notifier(self, titre: str, message: str) -> Dict:
         """Affiche une notification Windows.
 
-        Passe par l'API de notifications de Windows via PowerShell, sans aucune
-        dépendance supplémentaire. Si elle échoue — session sans bureau, mode
-        présentation — on se rabat sur `msg`, puis on rend la main : la
-        notification ne doit jamais faire échouer la surveillance.
+        L'envoi lui-même appartient à `assistant.notify` ; on lui passe notre
+        exécuteur pour que la surveillance reste entièrement injectable en
+        test, sans qu'aucun processus ne soit lancé.
         """
-        t = titre.replace("'", "''")
-        m = message.replace("'", "''")
-        script = (
-            "$ErrorActionPreference='Stop';"
-            "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications,"
-            " ContentType=WindowsRuntime] > $null;"
-            "$modele=[Windows.UI.Notifications.ToastNotificationManager]::"
-            "GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02);"
-            "$textes=$modele.GetElementsByTagName('text');"
-            f"$textes.Item(0).AppendChild($modele.CreateTextNode('{t}')) > $null;"
-            f"$textes.Item(1).AppendChild($modele.CreateTextNode('{m}')) > $null;"
-            "$toast=[Windows.UI.Notifications.ToastNotification]::new($modele);"
-            "[Windows.UI.Notifications.ToastNotificationManager]::"
-            "CreateToastNotifier('ANTI-ZEEVIRIUS').Show($toast)"
-        )
-        r = self._executer(["powershell", "-NoProfile", "-NonInteractive",
-                            "-Command", script], timeout=30)
-        if r["code"] == 0:
-            return {"ok": True, "data": {"methode": "notification Windows"}}
-
-        secours = self._executer(["msg", "*", f"{titre} — {message}"], timeout=15)
-        if secours["code"] == 0:
-            return {"ok": True, "data": {"methode": "msg"}}
-
-        return {"ok": False, "unavailable": True,
-                "reason": "aucun moyen de notification disponible sur ce système",
-                "error": "notification impossible"}
+        return envoyer_bulle(titre, message, executer=self._executer)
 
     # ── Surveillance continue ──────────────────────────────────────────────
     def surveiller(self, rappel: Optional[Callable[[Dict], None]] = None,

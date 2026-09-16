@@ -529,7 +529,7 @@ document.addEventListener('keydown', function (e) {
 /* ══════════════════════════════════════════════════════════════════════════
    NAVIGATION
    ══════════════════════════════════════════════════════════════════════════ */
-var VIEWS = ['tableau-de-bord', 'historique', 'protection', 'securite', 'nettoyage', 'rangement', 'systeme'];
+var VIEWS = ['tableau-de-bord', 'assistant', 'historique', 'protection', 'securite', 'nettoyage', 'rangement', 'systeme'];
 
 function route() {
   var name = (location.hash || '').replace(/^#\//, '');
@@ -2537,6 +2537,947 @@ $('histTable').addEventListener('click', function (e) {
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
+   COUCHE ASSISTANT — mémoire, jugement du risque, veille, initiative
+
+   Une seule règle gouverne cette section, et c'est elle qui en dicte la
+   forme : COMPRENDRE et EXÉCUTER sont deux gestes séparés par un clic
+   humain. `assistant.comprendre` ne lance rien — elle rend une lecture, sa
+   justification, son niveau de risque et sa confiance. L'exécution part
+   d'un autre bouton, sur une autre action du pont. Une capacité destructive
+   y ajoute encore le cycle déjà en place partout ailleurs dans cette
+   interface : dry_run → plan affiché → jeton de confirmation.
+
+   Deuxième règle, conséquence de la première : l'interface ne décide jamais
+   à la place du backend. Elle n'additionne pas les scores, ne compare pas
+   les seuils, ne suppose pas un paramètre absent. Elle lit `comprise`,
+   `exige_confirmation`, `risque` — et elle demande quand il manque quelque
+   chose.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Miroir d'AFFICHAGE du seuil normatif de `assistant/intent.py`
+   (SEUIL_CONFIANCE = 0,55). Il ne sert QU'À dessiner la barre du seuil sur
+   la jauge : la décision « comprise ou non » est prise par le backend et
+   lue dans le champ `comprise`. L'interface ne refait jamais ce calcul —
+   sinon deux vérités cohabiteraient, et un jour elles divergeraient. */
+var AS_SEUIL = 0.55;
+
+/* Échelle de risque du contrat : 0 lecture, 1 réversible, 2 destructif,
+   3 irréversible. Le libellé vient du pont ; seul le timbre est ici. */
+var AS_RISQUE_TONE = ['info', 'brand', 'warn', 'danger'];
+var AS_GRAVITE_TONE = { info: 'info', alerte: 'warn', critique: 'danger' };
+var AS_URGENCE_MOT = ['confort', 'à faire', 'important', 'urgent'];
+
+/* Libellés des paramètres que les capacités déclarent. Un paramètre inconnu
+   garde son nom brut : mieux vaut un intitulé technique qu'un intitulé
+   inventé sur un champ que l'utilisateur va remplir. */
+var AS_PARAM_LABELS = {
+  path: 'Dossier ou fichier', folders: 'Dossiers (séparés par des virgules)',
+  files: 'Fichiers (séparés par des virgules)', apps: 'Applications (séparées par des virgules)',
+  app: 'Application', id: 'Identifiant de l\'entrée', url: 'Adresse à vérifier',
+  mode: 'Mode de rangement (category, application, importance)',
+  sort_by: 'Tri (size, date, name)', include_admin: 'Inclure les emplacements administrateur',
+  older_than_days: 'Plus ancien que (jours)', days: 'Jours', jours: 'Jours', heures: 'Heures',
+  unused_threshold_days: 'Sans usage depuis (jours)', source: 'Source', target: 'Dossier d\'arrivée',
+  session_id: 'Identifiant de session', kind: 'Nature', plan: 'Plan', limite: 'Limite',
+  hive: 'Ruche du registre', key_path: 'Clé du registre', name: 'Nom', day: 'Jour', time: 'Heure'
+};
+/* Paramètres qui attendent une liste, et non une chaîne. */
+var AS_PARAM_LISTES = { folders: 1, files: 1, apps: 1 };
+/* Paramètres booléens : une case, jamais un champ texte à interpréter. */
+var AS_PARAM_BOOL = { include_admin: 1 };
+
+/* État local de la section. Rien n'est persisté : la mémoire de l'assistant
+   est côté backend, et une page rechargée doit relire, pas se souvenir. */
+var AS_LECTURE = null;     /* dernière intention lue, ou null */
+var AS_TELE = null;
+var AS_NOTIFS = [];
+var AS_SUGG = [];
+var AS_AUTO = null;
+
+function asRisqueTone(n) {
+  var i = Number(n);
+  return AS_RISQUE_TONE[i] || (i >= 3 ? 'danger' : 'info');
+}
+
+function pourcent(v, dec) {
+  var n = Number(v);
+  if (!isFinite(n)) return '—';
+  return n.toFixed(dec == null ? 0 : dec).replace('.', ',') + ' %';
+}
+
+/* Horodatages de la couche assistant : des secondes epoch, jamais une ISO. */
+function asQuand(ts) {
+  var n = Number(ts);
+  if (!isFinite(n) || n <= 0) return '—';
+  var d = new Date(n * 1000);
+  if (isNaN(d.getTime())) return '—';
+  var meme = d.toDateString() === new Date().toDateString();
+  return meme ? hhmmss(d).slice(0, 5)
+              : d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) + ' ' + hhmmss(d).slice(0, 5);
+}
+
+function asSecondes(s) {
+  var n = Number(s) || 0;
+  if (n < 90) return num(n) + ' s';
+  return num(n / 60) + ' min';
+}
+
+
+/* ══ 1. CONSOLE DE COMMANDE ═══════════════════════════════════════════════
+   Le point le plus important de la section. Le bouton « Comprendre »
+   n'appelle que `assistant.comprendre`, qui ne touche à rien. Le bouton
+   « Exécuter » est un autre bouton, dans une autre marche, et il reste
+   verrouillé tant qu'aucune lecture n'a franchi le seuil du backend.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* Remet l'étape 02 à zéro. Appelée dès que la phrase change : une lecture
+   qui ne correspond plus à ce qui est écrit dans le champ serait un piège. */
+function asOublierLecture(note) {
+  AS_LECTURE = null;
+  $('asLecture').hidden = true;
+  $('asLecture').dataset.etat = 'vide';
+  var s2 = $('asStep2');
+  s2.dataset.etat = 'vide';
+  $('asExecNote').innerHTML = note || 'Aucune intention lue pour l\'instant : l\'exécution reste ' +
+    'verrouillée. C\'est ce verrou qui empêche une phrase mal formulée de déclencher une purge.';
+  var b = $('btnAsExecuter');
+  b.disabled = true;
+  b.innerHTML = icon('check') + ' Exécuter cette capacité';
+  $('btnAsOublier').disabled = true;
+  var p = $('asParams');
+  p.hidden = true;
+  p.innerHTML = '';
+}
+
+/* Peint la jauge de confiance. `null` = la notion n'a pas de sens ici
+   (une suggestion du backend n'est pas une lecture de phrase) : le bloc
+   disparaît plutôt que d'afficher un score inventé. */
+function asPeindreConfiance(confiance, comprise) {
+  var bloc = $('asConf');
+  if (confiance == null) { bloc.hidden = true; return; }
+  bloc.hidden = false;
+  var c = Math.max(0, Math.min(1, Number(confiance) || 0));
+  bloc.dataset.franchi = comprise ? 'true' : 'false';
+  $('asConfVal').textContent = pourcent(c * 100);
+  $('asConfFill').style.width = (c * 100).toFixed(1) + '%';
+  var seuil = $('asConfSeuil');
+  seuil.style.left = (AS_SEUIL * 100).toFixed(1) + '%';
+  seuil.querySelector('span').textContent = 'seuil ' + pourcent(AS_SEUIL * 100);
+  $('asConfNote').textContent = comprise
+    ? 'La certitude dépasse le seuil requis pour proposer une exécution. Le seuil est franchi, ' +
+      'pas l\'action : elle attend toujours votre clic.'
+    : 'La certitude reste sous le seuil requis pour agir. L\'assistant demande une reformulation ' +
+      'au lieu de deviner — c\'est voulu.';
+}
+
+/* Affiche la lecture rendue par `assistant.comprendre`, telle quelle. */
+function asPeindreLecture(d) {
+  var detail = d.detail || null;
+  var comprise = !!d.comprise;
+  AS_LECTURE = {
+    capacite: d.capacite || '', parametres: d.parametres || {},
+    detail: detail, origine: d.origine || 'phrase'
+  };
+
+  var carte = $('asLecture');
+  carte.hidden = false;
+  carte.dataset.etat = comprise ? 'comprise' : 'refusee';
+
+  $('asLectKicker').textContent = d.origine === 'suggestion'
+    ? 'Suggestion reprise dans la console'
+    : (comprise ? 'Intention comprise' : 'Aucune intention retenue');
+
+  var puce = $('asLectRisque');
+  if (detail) {
+    puce.dataset.tone = asRisqueTone(detail.risque);
+    puce.textContent = detail.risque_libelle || ('risque ' + detail.risque);
+  } else {
+    puce.dataset.tone = 'warn';
+    puce.textContent = 'aucune capacité';
+  }
+
+  $('asLectTitre').textContent = detail ? detail.titre
+    : (comprise ? (d.capacite || '—') : 'Reformulez votre demande');
+  $('asLectDesc').textContent = detail ? (detail.description || '')
+    : 'L\'assistant préfère demander plutôt que deviner. Rien n\'a été exécuté, rien n\'a été préparé.';
+
+  asPeindreConfiance(d.confiance, comprise);
+  $('asLectJust').textContent = d.justification || '—';
+
+  var lignes = [];
+  if (detail) {
+    lignes.push(['Capacité', '<span class="mono">' + esc(detail.nom) + '</span>']);
+    lignes.push(['Catégorie', esc(detail.categorie || '—')]);
+    lignes.push(['Action du pont', '<span class="mono">' + esc(detail.action_bridge || '(interne)') + '</span>']);
+    var lus = Object.keys(d.parametres || {});
+    lignes.push(['Paramètres lus dans la phrase', lus.length
+      ? lus.map(function (k) { return esc(k) + ' = ' + esc(d.parametres[k]); }).join('<br>')
+      : 'aucun']);
+  }
+  /* Champ redondant et volontaire, comme dans la réponse du pont : il dit
+     dans l'interface elle-même qu'aucune action n'a eu lieu. */
+  lignes.push(['Exécution', 'aucune — cette étape ne touche à rien']);
+  $('asLectMeta').innerHTML = kv(lignes);
+
+  if (!comprise || !detail) {
+    $('asStep2').dataset.etat = 'refusee';
+    $('asExecNote').innerHTML = 'Rien à exécuter : la lecture n\'a pas franchi le seuil du backend. ' +
+      'Nommez l\'action <b>et</b> son objet — « analyse le dossier Téléchargements » plutôt que ' +
+      '« occupe-toi de mes fichiers ».';
+    $('btnAsExecuter').disabled = true;
+    $('btnAsOublier').disabled = false;
+    $('asParams').hidden = true;
+    return;
+  }
+
+  asPreparerExecution(detail, d.parametres || {});
+}
+
+/* Prépare l'étape 02 : annonce ce que le clic engagera, et réclame les
+   paramètres que la phrase ne contenait pas. Deviner un chemin, c'est
+   nettoyer au mauvais endroit : ils sont demandés, jamais supposés. */
+function asPreparerExecution(detail, parametres) {
+  var s2 = $('asStep2');
+  s2.dataset.etat = 'prete';
+
+  var manquants = (detail.parametres || []).filter(function (nom) {
+    return !(nom in (parametres || {}));
+  });
+
+  var zone = $('asParams');
+  if (manquants.length) {
+    zone.hidden = false;
+    zone.innerHTML = '<p class="as-params-h">Cette capacité attend des précisions absentes de votre ' +
+      'phrase. Elles ne seront pas devinées : un paramètre supposé, c\'est une action au mauvais ' +
+      'endroit. Un champ laissé vide n\'est pas envoyé — le backend appliquera son propre défaut ou ' +
+      'refusera proprement.</p>' +
+      manquants.map(function (nom) {
+        var lbl = AS_PARAM_LABELS[nom] || nom;
+        if (AS_PARAM_BOOL[nom]) {
+          return '<label class="check as-param-check"><input type="checkbox" data-asparam="' + esc(nom) +
+            '" data-astype="bool"><span></span>' + esc(lbl) + '</label>';
+        }
+        return '<label class="as-param"><span>' + esc(lbl) + '</span>' +
+          '<input class="inp" type="text" autocomplete="off" data-asparam="' + esc(nom) + '"' +
+          (AS_PARAM_LISTES[nom] ? ' data-astype="liste"' : '') + '></label>';
+      }).join('');
+  } else {
+    zone.hidden = true;
+    zone.innerHTML = '';
+  }
+
+  $('asExecNote').innerHTML = detail.exige_confirmation
+    ? '<b>' + esc(detail.titre) + '</b> est une capacité de niveau <b>' + esc(detail.risque_libelle) +
+      '</b>. Le bouton n\'exécute rien directement : il demande d\'abord le plan exact au backend ' +
+      '(<span class="mono">dry_run</span>), l\'affiche, et n\'exécute qu\'avec le jeton de ' +
+      'confirmation et votre accusé de lecture — comme toutes les opérations destructives de cette interface.'
+    : '<b>' + esc(detail.titre) + '</b> est une capacité de niveau <b>' + esc(detail.risque_libelle) +
+      '</b> : elle n\'écrit rien qui ne soit réversible depuis l\'Historique. Le clic l\'exécute directement.';
+
+  var b = $('btnAsExecuter');
+  b.disabled = false;
+  b.innerHTML = icon(detail.exige_confirmation ? 'alert' : 'check') + ' ' +
+    (detail.exige_confirmation ? 'Voir le plan puis exécuter' : 'Exécuter') +
+    ' — ' + esc(detail.titre);
+  $('btnAsOublier').disabled = false;
+}
+
+/* Relit les champs de l'étape 02. Un champ vide est OMIS : envoyer une
+   chaîne vide ferait croire au backend qu'on a répondu. */
+function asRassemblerParams() {
+  var out = {};
+  var lus = (AS_LECTURE && AS_LECTURE.parametres) || {};
+  Object.keys(lus).forEach(function (k) { out[k] = lus[k]; });
+
+  $$('[data-asparam]', $('asParams')).forEach(function (el) {
+    var nom = el.dataset.asparam;
+    if (el.dataset.astype === 'bool') { if (el.checked) out[nom] = true; return; }
+    var v = String(el.value || '').trim();
+    if (!v) return;
+    out[nom] = el.dataset.astype === 'liste' ? splitPaths(v) : v;
+  });
+  return out;
+}
+
+function asComprendre() {
+  var phrase = String($('asPhrase').value || '').trim();
+  if (!phrase) {
+    toast('Console', 'Écrivez d\'abord ce que vous voulez faire.', 'warn');
+    $('asPhrase').focus();
+    return;
+  }
+  asOublierLecture();
+  $('asCmdResult').hidden = true;
+  var b = $('btnAsComprendre');
+  b.disabled = true;
+
+  call('assistant.comprendre', { phrase: phrase }).then(function (res) {
+    b.disabled = false;
+    if (!res.ok) {
+      /* Module de compréhension absent : l'échec est annoncé pour ce qu'il
+         est, et l'étape 02 reste verrouillée — jamais une exécution « au
+         cas où » sur une lecture qui n'a pas eu lieu. */
+      handleFail(res, 'asCmdResult', 'Compréhension');
+      asOublierLecture('La compréhension des phrases est indisponible sur ce poste : aucune intention ' +
+        'ne peut être lue, donc rien ne peut être exécuté depuis la console. Les suggestions et les ' +
+        'panneaux de la section restent utilisables.');
+      return;
+    }
+    var d = res.data || {};
+    asPeindreLecture(d);
+    logLine('Console : « ' + phrase + '  » → ' +
+      (d.comprise ? d.capacite + ' (' + pourcent((d.confiance || 0) * 100) + ')' : 'aucune capacité retenue'),
+      d.comprise ? 'info' : 'warn');
+  });
+}
+
+/* Résumé générique d'un résultat de capacité. Chaque module rend sa propre
+   forme ; la console ne prétend pas la connaître, elle en montre les
+   grandeurs lisibles et renvoie au panneau spécialisé pour le détail. */
+function asResumeGenerique(obj) {
+  if (!obj || typeof obj !== 'object') return '';
+  var pairs = [];
+  Object.keys(obj).forEach(function (k) {
+    if (pairs.length >= 8) return;
+    var v = obj[k];
+    if (v == null || k === 'ok') return;
+    if (typeof v === 'boolean') pairs.push([k, v ? 'oui' : 'non']);
+    else if (typeof v === 'number') pairs.push([k, num(v)]);
+    else if (typeof v === 'string' && v.length <= 90) pairs.push([k, esc(v)]);
+    else if (Array.isArray(v)) pairs.push([k, num(v.length) + ' élément(s)']);
+  });
+  return pairs.length ? kv(pairs) : '';
+}
+
+/* Seule voie d'exécution de la section : console et suggestions y passent
+   toutes les deux. Le tri se fait sur ce que le PONT déclare
+   (`exige_confirmation`), jamais sur une règle recopiée ici. */
+function asExecuterCapacite(detail, params, resultId, apres) {
+  if (!detail) return;
+  var action = detail.action_bridge || '';
+  if (!action) {
+    showResult(resultId, 'warn', 'Capacité interne',
+      '<p>« ' + esc(detail.titre) + ' » n\'a pas d\'action web : elle n\'est utilisée qu\'à ' +
+      'l\'intérieur de l\'assistant et ne peut pas être lancée depuis l\'interface.</p>');
+    return;
+  }
+
+  if (detail.exige_confirmation) {
+    /* Exactement le mécanisme des autres actions destructives de
+       l'interface — il n'est pas réécrit ici, il est appelé. */
+    return destructive({
+      action: action,
+      body: params,
+      title: detail.titre,
+      label: detail.titre,
+      lead: 'Cette capacité a été reconnue à partir de votre demande, puis retenue par votre clic. ' +
+            'Voici ce qu\'elle ferait exactement. Rien n\'a encore été touché.',
+      /* L'échelle du contrat, à la lettre : seul le niveau RÉVERSIBLE (1)
+         est annulable par l'Historique. DESTRUCTIF (2) perd des données —
+         la modale doit rester rouge et le dire, comme elle le fait déjà
+         pour le nettoyage complet dans la section Nettoyage. */
+      reversible: Number(detail.risque) <= 1,
+      execLabel: Number(detail.risque) >= 3 ? 'Exécuter définitivement' : 'Exécuter',
+      revNote: Number(detail.risque) >= 3
+        ? '<b>Opération irréversible.</b> Ni l\'Historique ni la quarantaine ne pourront la défaire.'
+        : (Number(detail.risque) >= 2
+            ? '<b>Perte de données possible.</b> Ce que cette opération supprime ne sera pas ' +
+              'récupérable depuis l\'Historique.'
+            : 'Opération réversible : elle reste annulable depuis la section Historique.'),
+      resultId: resultId,
+      onDone: function (data) {
+        var r = (data && data.result) || {};
+        showResult(resultId, 'ok', '« ' + detail.titre + '  » exécutée',
+          '<p>Capacité <span class="mono">' + esc(detail.nom) + '</span> exécutée après validation ' +
+          'explicite du plan.</p>' + asResumeGenerique(r));
+        loadStatus(true);
+        if (apres) apres();
+      }
+    });
+  }
+
+  /* Lecture (ou réversible que le pont ne fait pas confirmer) : exécution
+     directe. `runJob` couvre les deux formes de réponse du contrat — un
+     résultat immédiat, ou un `job_id` à sonder. */
+  showJobline('asCmdJob', true);
+  $('asCmdJobTitle').textContent = detail.titre;
+  pathText($('asCmdJobCurrent'), 'démarrage…');
+  return runJob(action, params, {
+    onProgress: function (d) { setJobline('asCmdJob', d); },
+    onDone: function (r) {
+      showJobline('asCmdJob', false);
+      var res = r || {};
+      showResult(resultId, 'ok', '« ' + detail.titre + '  » exécutée',
+        '<p>Capacité <span class="mono">' + esc(detail.nom) + '</span> (' +
+        esc(detail.risque_libelle) + ') exécutée. Le détail complet s\'affiche dans le panneau ' +
+        'spécialisé de la section correspondante.</p>' + asResumeGenerique(res));
+      toast(detail.titre, 'Capacité exécutée.', 'ok');
+      loadStatus(true);
+      if (apres) apres();
+    },
+    onFail: function (res) {
+      showJobline('asCmdJob', false);
+      handleFail(res, resultId, detail.titre);
+    }
+  });
+}
+
+$('btnAsComprendre').addEventListener('click', asComprendre);
+
+$('asPhrase').addEventListener('keydown', function (e) {
+  /* Entrée déclenche la COMPRÉHENSION, jamais l'exécution : la touche la
+     plus facile à frapper par erreur ne doit pas pouvoir engager la machine. */
+  if (e.key === 'Enter') { e.preventDefault(); asComprendre(); }
+});
+
+/* Une lecture ne survit pas à la modification de la phrase qui l'a produite. */
+$('asPhrase').addEventListener('input', function () {
+  if (AS_LECTURE) asOublierLecture('La phrase a changé depuis la dernière lecture : ' +
+    'relancez « Comprendre » avant d\'exécuter quoi que ce soit.');
+});
+
+$$('[data-asphrase]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    $('asPhrase').value = b.dataset.asphrase;
+    asOublierLecture();
+    $('asPhrase').focus();
+  });
+});
+
+$('btnAsOublier').addEventListener('click', function () { asOublierLecture(); });
+
+$('btnAsExecuter').addEventListener('click', function () {
+  if (!AS_LECTURE || !AS_LECTURE.detail) return;
+  asExecuterCapacite(AS_LECTURE.detail, asRassemblerParams(), 'asCmdResult', function () {
+    asRafraichirAssistant(true);
+  });
+});
+
+
+/* ══ 2. CYCLE DE CONFIRMATION SANS MODALE ════════════════════════════════
+   Trois actions de la couche assistant écrivent et passent donc par
+   `_guarded()` côté pont : profil, acquittement, mode autonome. Deux
+   d'entre elles sont de niveau RÉVERSIBLE, pour lesquelles le pont répond
+   lui-même `exige_confirmation: false`. Leur imposer la modale destructive
+   apprendrait à cocher « j'ai lu » sans lire — exactement le risque que la
+   modale existe pour écarter. Le couple dry_run → confirm_token est
+   respecté à la lettre ; c'est le clic qui tient lieu de validation.
+   L'activation du mode autonome, elle, garde la modale : son plan énonce la
+   limite du mode, et cette limite doit être lue.
+   ════════════════════════════════════════════════════════════════════════ */
+function cycleGuarde(action, body) {
+  var dry = {};
+  Object.keys(body || {}).forEach(function (k) { dry[k] = body[k]; });
+  dry.dry_run = true;
+
+  return call(action, dry).then(function (res) {
+    if (!res.ok) return res;
+    var d = res.data || {};
+    var token = d.confirm_token;
+    if (!token) {
+      return { ok: false, unavailable: false,
+               error: 'Le backend n\'a pas fourni de jeton de confirmation : opération refusée par sécurité.' };
+    }
+    var reel = {};
+    Object.keys(body || {}).forEach(function (k) { reel[k] = body[k]; });
+    reel.dry_run = false;
+    reel.confirm_token = token;
+    return call(action, reel).then(function (r2) {
+      if (r2 && r2.ok && r2.data) r2.data.plan = d.plan || null;
+      return r2;
+    });
+  });
+}
+
+
+/* ══ 3. FIL DE NOTIFICATIONS ═════════════════════════════════════════════ */
+var asNotifFiltre = segGroup('asnotif', function () { asChargerNotifs(); });
+
+function asNotifRow(n) {
+  var tone = AS_GRAVITE_TONE[n.gravite] || 'info';
+  var acq = !!n.acquittee;
+  return '<div class="trow is-multi is-desc' + (acq ? ' is-acq' : (tone === 'danger' ? ' is-warm' : '')) + '">' +
+    '<span class="chip" data-tone="' + tone + '">' + esc(n.gravite) + '</span>' +
+    '<span class="tmain"><b>' + esc(n.titre) + '</b><small>' + esc(n.source || '') + '</small></span>' +
+    '<span class="as-when">' + esc(asQuand(n.horodatage)) + '</span>' +
+    '<span class="tact">' + (acq
+      ? '<span class="chip" data-tone="ok">' + icon('check') + 'acquittée</span>'
+      : '<button class="btn btn-ghost btn-sm" type="button" data-asack="' + esc(n.identifiant) + '">Acquitter</button>') +
+    '</span>' +
+    '<span class="treason">' + esc(n.corps || '') + '</span></div>';
+}
+
+function asChargerNotifs() {
+  return call('assistant.notifications',
+    { non_acquittees_seulement: asNotifFiltre.v === '1' }).then(function (res) {
+    if (!res.ok) {
+      setEmpty('asNotifTable', 'Fil de notifications indisponible.');
+      handleFail(res, 'asNotifResult', 'Notifications');
+      return;
+    }
+    var d = res.data || {};
+    AS_NOTIFS = d.notifications || [];
+    var puce = $('asNotifCount');
+    var nb = Number(d.non_acquittees) || 0;
+    puce.dataset.tone = nb ? 'warn' : 'ok';
+    puce.textContent = nb ? num(nb) + ' non acquittée(s)' : 'fil à jour';
+
+    if (!AS_NOTIFS.length) {
+      setEmpty('asNotifTable', asNotifFiltre.v === '1'
+        ? 'Aucune alerte en attente : tout a été acquitté.'
+        : 'Aucune notification. La veille n\'a rien eu à signaler.');
+      return;
+    }
+    $('asNotifTable').innerHTML = scroller(AS_NOTIFS.map(asNotifRow).join(''));
+  });
+}
+
+$('btnAsNotifs').addEventListener('click', function () { asChargerNotifs(); });
+
+$('asNotifTable').addEventListener('click', function (e) {
+  var b = e.target.closest ? e.target.closest('[data-asack]') : null;
+  if (!b) return;
+  var id = b.dataset.asack;
+  var ligne = b.closest('.trow');
+  var titre = ligne ? ligne.querySelector('.tmain b').textContent : 'alerte';
+  b.disabled = true;
+  cycleGuarde('assistant.acquitter', { identifiant: id }).then(function (res) {
+    if (!res.ok) {
+      b.disabled = false;
+      handleFail(res, 'asNotifResult', 'Acquittement');
+      return;
+    }
+    var r = (res.data && res.data.result) || {};
+    if (r.acquittee === false) {
+      b.disabled = false;
+      showResult('asNotifResult', 'warn', 'Rien à acquitter',
+        '<p>Aucune notification ne porte cet identifiant : le fil a peut-être été rechargé.</p>');
+      return;
+    }
+    toast('Notifications', 'Acquittée : ' + titre, 'ok');
+    asChargerNotifs();
+  });
+});
+
+
+/* ══ 4. TÉLÉMÉTRIE EN DIRECT ═════════════════════════════════════════════
+   `psutil` peut manquer — sur une machine à désinfecter, l'installer est
+   parfois impossible. Dans ce cas la couche rend `disponible: false` et des
+   échantillons à zéro : afficher « 0 % » serait un mensonge, les jauges
+   passent donc à « n. d. » et la raison est écrite en clair.
+   ════════════════════════════════════════════════════════════════════════ */
+var asMetrique = segGroup('asmetric', function () {
+  if (AS_TELE) asPeindreCourbe(AS_TELE.historique || [], asMetrique.v);
+});
+
+var AS_METRIQUE_NOM = { cpu: 'Processeur', memoire: 'Mémoire', disque: 'Disque système' };
+
+function asJauge(caseId, valId, valeur, unite, seuils) {
+  var g = $(caseId), b = $(valId);
+  if (valeur == null || !isFinite(Number(valeur))) {
+    g.dataset.tone = '';
+    g.classList.add('is-mute');
+    b.textContent = 'n. d.';
+    return;
+  }
+  var v = Number(valeur);
+  g.classList.remove('is-mute');
+  g.dataset.tone = v >= seuils[1] ? 'danger' : (v >= seuils[0] ? 'warn' : '');
+  b.textContent = unite === '%' ? pourcent(v) : (num(v) + ' ' + unite);
+}
+
+function asJaugesMuettes() {
+  ['asGCpu', 'asGMem', 'asGDisk', 'asGTemp'].forEach(function (id) {
+    var g = $(id);
+    g.dataset.tone = '';
+    g.classList.add('is-mute');
+    g.querySelector('b').textContent = 'n. d.';
+  });
+}
+
+/* Courbe sobre : une seule grandeur à la fois, échelle fixe 0–100 %, une
+   ligne de repère à 50 %. Dessinée en pixels réels (et non par un viewBox
+   étiré) pour que l'épaisseur du trait ne dépende pas de la largeur. */
+function asPeindreCourbe(historique, metrique) {
+  var el = $('asTeleChart');
+  var pts = (historique || []).map(function (e) { return Number(e[metrique]); })
+    .filter(function (v) { return isFinite(v); });
+
+  if (pts.length < 2) {
+    el.innerHTML = '<p class="empty">Historique en construction : il faut au moins deux relevés. ' +
+      'Chaque lecture de cette section en ajoute un.</p>';
+    return;
+  }
+
+  var W = Math.max(220, el.clientWidth - 24) || 320;
+  var H = 96, pad = 3;
+  var pas = (W - 26) / (pts.length - 1);
+  var y = function (v) { return pad + (1 - Math.max(0, Math.min(100, v)) / 100) * (H - pad * 2); };
+  var coords = pts.map(function (v, i) { return (26 + i * pas).toFixed(1) + ',' + y(v).toFixed(1); });
+  var aire = 'M26,' + y(pts[0]).toFixed(1) + ' L' + coords.join(' L') +
+    ' L' + (26 + (pts.length - 1) * pas).toFixed(1) + ',' + (H - pad).toFixed(1) +
+    ' L26,' + (H - pad).toFixed(1) + ' Z';
+  var dernier = pts[pts.length - 1];
+
+  var duree = 0;
+  if (historique.length > 1) {
+    duree = Number(historique[historique.length - 1].horodatage) - Number(historique[0].horodatage);
+  }
+
+  el.innerHTML =
+    '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" role="img" ' +
+    'aria-label="Historique de ' + esc(AS_METRIQUE_NOM[metrique] || metrique) + '">' +
+    '<defs><linearGradient id="asTeleGrad" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0%" stop-color="#ff9a2e" stop-opacity=".34"/>' +
+    '<stop offset="100%" stop-color="#ff9a2e" stop-opacity="0"/>' +
+    '</linearGradient></defs>' +
+    '<line class="ac-grid" x1="26" y1="' + y(100).toFixed(1) + '" x2="' + W + '" y2="' + y(100).toFixed(1) + '"/>' +
+    '<line class="ac-grid" x1="26" y1="' + y(50).toFixed(1) + '" x2="' + W + '" y2="' + y(50).toFixed(1) + '"/>' +
+    '<line class="ac-grid" x1="26" y1="' + y(0).toFixed(1) + '" x2="' + W + '" y2="' + y(0).toFixed(1) + '"/>' +
+    '<text class="ac-lbl" x="0" y="' + (y(100) + 3).toFixed(1) + '">100</text>' +
+    '<text class="ac-lbl" x="4" y="' + (y(50) + 3).toFixed(1) + '">50</text>' +
+    '<text class="ac-lbl" x="10" y="' + (y(0) + 3).toFixed(1) + '">0</text>' +
+    '<path class="ac-area" d="' + aire + '"/>' +
+    '<polyline class="ac-line" points="' + coords.join(' ') + '"/>' +
+    '<circle class="ac-dot" cx="' + (26 + (pts.length - 1) * pas).toFixed(1) + '" cy="' +
+    y(dernier).toFixed(1) + '" r="2.6"/>' +
+    '</svg>' +
+    '<p class="as-chart-foot"><span>' + esc(AS_METRIQUE_NOM[metrique] || metrique) + ' — ' +
+    num(pts.length) + ' relevé(s) sur ' + esc(asSecondes(duree)) + '</span>' +
+    '<span>dernier : ' + esc(pourcent(dernier)) + '</span></p>';
+}
+
+function asPeindreTele(d) {
+  AS_TELE = d;
+  var dispo = !!d.disponible;
+  var e = d.echantillon || {};
+  $('asTeleLamp').dataset.on = dispo ? 'true' : 'false';
+
+  if (!dispo) {
+    asJaugesMuettes();
+    $('asTeleChart').innerHTML = '<p class="empty">Aucun historique : cette machine ne publie pas sa charge.</p>';
+    showResult('asTeleResult', 'warn', 'Télémétrie indisponible',
+      '<p>Le module <span class="mono">psutil</span> n\'est pas installé sur ce poste : la charge du ' +
+      'processeur, de la mémoire, du disque et la température ne peuvent pas être relevées.</p>' +
+      '<p class="p-note">Ce n\'est pas une panne, et rien d\'autre n\'en dépend : l\'analyse des ' +
+      'fichiers, la quarantaine et les suggestions qui n\'utilisent pas la charge continuent de ' +
+      'fonctionner normalement. Les valeurs sont affichées « n. d. » plutôt qu\'à zéro, pour ne pas ' +
+      'faire passer une absence de mesure pour une machine au repos.</p>');
+    $('asTeleNote').textContent = 'Jauges en « n. d. » : aucune mesure disponible, aucune valeur inventée.';
+    return;
+  }
+
+  $('asTeleResult').hidden = true;
+  asJauge('asGCpu', 'asTeleCpu', e.cpu, '%', [70, 90]);
+  asJauge('asGMem', 'asTeleMem', e.memoire, '%', [80, 92]);
+  asJauge('asGDisk', 'asTeleDisk', e.disque, '%', [85, 93]);
+  asJauge('asGTemp', 'asTeleTemp', e.temperature, '°C', [75, 88]);
+
+  var moy = d.moyennes || null;
+  $('asTeleNote').textContent = moy
+    ? 'Moyenne sur ' + asSecondes(d.fenetre) + ' : processeur ' + pourcent(moy.cpu) +
+      ', mémoire ' + pourcent(moy.memoire) + ', disque ' + pourcent(moy.disque) +
+      (e.temperature == null ? ' — température non publiée par cette machine.' : '.')
+    : 'La télémétrie mesure, elle n\'interprète pas : l\'interprétation est le travail des suggestions.';
+
+  asPeindreCourbe(d.historique || [], asMetrique.v);
+}
+
+function asChargerTele(silencieux) {
+  return call('assistant.telemetrie', { secondes: 300, limite: 120 }).then(function (res) {
+    if (!res.ok) {
+      $('asTeleLamp').dataset.on = 'false';
+      asJaugesMuettes();
+      $('asTeleChart').innerHTML = '<p class="empty">Aucun historique disponible.</p>';
+      if (!silencieux) handleFail(res, 'asTeleResult', 'Télémétrie');
+      else showResult('asTeleResult', 'warn', 'Télémétrie indisponible',
+        '<p>' + esc(res.reason || res.error || 'Module de télémétrie indisponible.') + '</p>');
+      return;
+    }
+    asPeindreTele(res.data || {});
+  });
+}
+
+$('btnAsTele').addEventListener('click', function () { asChargerTele(false); });
+
+
+/* ══ 5. SUGGESTIONS ══════════════════════════════════════════════════════ */
+function asSuggRow(s, i) {
+  var d = s.detail || null;
+  var u = Math.max(0, Math.min(3, Number(s.urgence) || 0));
+  return '<div class="trow is-multi is-desc' + (u >= 3 ? ' is-warm' : '') + '">' +
+    '<span class="as-urg" data-u="' + u + '" title="urgence ' + u + ' sur 3 — ' +
+    esc(AS_URGENCE_MOT[u]) + '">' + u + '</span>' +
+    '<span class="tmain"><b>' + esc(d ? d.titre : s.capacite) + '</b><small>' + esc(s.capacite) + '</small></span>' +
+    (d ? '<span class="chip" data-tone="' + asRisqueTone(d.risque) + '">' + esc(d.risque_libelle) + '</span>' : '') +
+    '<span class="tact"><button class="btn btn-ghost btn-sm" type="button" data-assugg="' + i + '">' +
+    (d ? 'Reprendre' : 'Indisponible') + '</button></span>' +
+    '<span class="treason">' + esc(s.motif || '') + '</span></div>';
+}
+
+function asChargerSugg() {
+  return call('assistant.suggestions', {}).then(function (res) {
+    if (!res.ok) {
+      setEmpty('asSuggTable', 'Suggestions indisponibles.');
+      handleFail(res, 'asSuggResult', 'Suggestions');
+      return;
+    }
+    var d = res.data || {};
+    /* Le pont les rend déjà triées ; le tri est refait ici parce que
+       l'ordre d'affichage est une promesse de l'interface, pas un effet de
+       bord de l'ordre d'arrivée. */
+    AS_SUGG = (d.suggestions || []).slice().sort(function (a, b) {
+      return (Number(b.urgence) || 0) - (Number(a.urgence) || 0);
+    });
+    var puce = $('asSuggCount');
+    var urgentes = AS_SUGG.filter(function (s) { return Number(s.urgence) >= 2; }).length;
+    puce.dataset.tone = urgentes ? 'warn' : (AS_SUGG.length ? 'info' : 'ok');
+    puce.textContent = AS_SUGG.length
+      ? num(AS_SUGG.length) + ' suggestion(s)' + (urgentes ? ', ' + num(urgentes) + ' importante(s)' : '')
+      : 'rien à proposer';
+
+    if (!AS_SUGG.length) {
+      setEmpty('asSuggTable', 'Aucune suggestion : rien d\'anormal n\'a été constaté sur cette machine.');
+      return;
+    }
+    $('asSuggTable').innerHTML = scroller(AS_SUGG.map(asSuggRow).join(''));
+  });
+}
+
+$('btnAsSugg').addEventListener('click', function () { asChargerSugg(); });
+
+/* Reprendre une suggestion, c'est la charger dans la console — pas la
+   lancer. Elle emprunte alors exactement le même chemin qu'une phrase
+   comprise : étape 02, paramètres réclamés, modale si le pont l'exige. Une
+   seule porte de sortie vers l'exécution, donc une seule à surveiller. */
+$('asSuggTable').addEventListener('click', function (e) {
+  var b = e.target.closest ? e.target.closest('[data-assugg]') : null;
+  if (!b) return;
+  var s = AS_SUGG[Number(b.dataset.assugg)];
+  if (!s || !s.detail) {
+    showResult('asSuggResult', 'warn', 'Capacité inconnue du registre',
+      '<p>Cette suggestion nomme une capacité que le registre ne décrit pas : elle ne peut pas être ' +
+      'exécutée depuis l\'interface.</p>');
+    return;
+  }
+  $('asPhrase').value = '';
+  asPeindreLecture({
+    phrase: '', capacite: s.capacite, parametres: {}, confiance: null,
+    justification: 'Suggestion émise par la veille : ' + (s.motif || '') +
+      ' (urgence ' + (Number(s.urgence) || 0) + ' sur 3, ' + AS_URGENCE_MOT[Math.max(0, Math.min(3, Number(s.urgence) || 0))] + ').',
+    comprise: true, detail: s.detail, origine: 'suggestion'
+  });
+  $('pAssistCmd').scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'center' });
+  toast('Suggestion reprise', 'Elle attend votre clic dans la console : rien n\'est encore lancé.', 'info');
+});
+
+
+/* ══ 6. MODE AUTONOME ════════════════════════════════════════════════════
+   Un interrupteur, son journal, et un arrêt qui n'attend pas. Ce que le
+   mode NE FAIT PAS est écrit dans le panneau lui-même (encart jaune), parce
+   que « mode autonome » laisse spontanément croire qu'une machine va
+   toucher au disque toute seule. Elle ne le fera pas : le pont refuse toute
+   capacité au-dessus de LECTURE, et tout le reste devient une suggestion.
+   ════════════════════════════════════════════════════════════════════════ */
+/* Le mot « action » est remplacé par « lecture » à l'affichage : c'est ce
+   que le journal raconte réellement, puisque le mode autonome n'engage
+   jamais autre chose. Écrit en fonction et non en table pour ne pas semer
+   dans le fichier une paire `action: '…'` qui ressemblerait, aux yeux du
+   contrôle statique des tests, à l'appel d'une action du pont. */
+function asJournalMot(t) {
+  if (t === 'action') return 'lecture';
+  if (t === 'demarrage') return 'démarrage';
+  if (t === 'arret') return 'arrêt';
+  if (t === 'resultat') return 'résultat';
+  return String(t || '—');
+}
+
+function asJournalTexte(e) {
+  var t = e.type;
+  var titre = e.titre || e.capacite || '';
+  if (t === 'action') {
+    return '« ' + titre + ' » engagée en lecture seule — ' + (e.motif || '');
+  }
+  if (t === 'resultat') {
+    return '« ' + titre + ' » terminée : ' + (e.ok === false ? 'échec' : 'succès') +
+      (e.duree != null ? ' en ' + asSecondes(e.duree) : '');
+  }
+  if (t === 'suggestion') {
+    return '« ' + titre + ' » proposée, jamais exécutée — ' + (e.raison || e.motif || '');
+  }
+  return e.motif || e.raison || '—';
+}
+
+function asJournalRow(e) {
+  var t = String(e.type || '');
+  return '<div class="as-jrow" data-t="' + esc(t) + '">' +
+    '<time>' + esc(asQuand(e.horodatage)) + '</time>' +
+    '<span class="as-jk">' + esc(asJournalMot(t)) + '</span>' +
+    '<p>' + esc(asJournalTexte(e)) + '</p></div>';
+}
+
+function asPeindreAuto(d) {
+  AS_AUTO = d || {};
+  d = AS_AUTO;
+  var actif = !!d.actif;
+
+  $('asAutoLamp').dataset.on = actif ? 'true' : 'false';
+  var box = $('asAutoState');
+  /* Jaune quand il tourne, pas rouge : ce n'est pas une urgence. Mais pas
+     vert non plus — une machine qui agit seule mérite qu'on le remarque. */
+  box.dataset.actif = actif ? 'warn' : 'false';
+  $('asAutoStateVal').textContent = actif ? 'ACTIF — lecture seule' : 'Arrêté';
+
+  var journal = d.journal || [];
+  var agies = journal.filter(function (e) { return e.type === 'action'; }).length;
+  var proposees = journal.filter(function (e) { return e.type === 'suggestion'; }).length;
+
+  $('asAutoStateMsg').textContent = actif
+    ? 'Un cycle toutes les ' + asSecondes(d.intervalle) + ', au plus ' + num(d.budget) +
+      ' action(s) par cycle, uniquement des capacités de lecture. ' + num(d.cycles) +
+      ' cycle(s) exécuté(s) depuis l\'activation.'
+    : (d.executeur === false
+        ? 'Aucun exécuteur n\'est branché sur cette instance : le mode autonome ne pourrait rien lancer.'
+        : 'Aucune surveillance autonome en cours. Les suggestions restent calculées à la demande, ' +
+          'et aucune action n\'est engagée sans vous.');
+
+  $('asAutoKv').innerHTML = kv([
+    ['Budget par cycle', num(d.budget) + ' action(s)'],
+    ['Intervalle', esc(asSecondes(d.intervalle))],
+    ['Cycles exécutés', num(d.cycles)],
+    ['Actions engagées', num(agies) + ' (lecture seule)'],
+    ['Devenues suggestions', num(proposees)]
+  ]);
+
+  $('btnAsAutoStart').disabled = actif;
+  $('btnAsAutoStop').disabled = !actif;
+
+  if (!journal.length) {
+    setEmpty('asAutoJournal', 'Aucun cycle exécuté : le journal est vide.');
+    return;
+  }
+  $('asAutoJournal').innerHTML = scroller(journal.slice().reverse().map(asJournalRow).join(''));
+}
+
+function asChargerAuto(silencieux) {
+  return call('assistant.autonomie', {}).then(function (res) {
+    if (!res.ok) {
+      $('asAutoLamp').dataset.on = 'false';
+      $('asAutoStateVal').textContent = 'État illisible';
+      $('asAutoStateMsg').textContent = res.reason || res.error || 'Mode autonome indisponible.';
+      $('asAutoState').dataset.actif = 'warn';
+      if (!silencieux) handleFail(res, 'asAutoResult', 'Mode autonome');
+      return;
+    }
+    asPeindreAuto(res.data || {});
+  });
+}
+
+$('btnAsAuto').addEventListener('click', function () { asChargerAuto(false); });
+
+/* Activation : la modale est GARDÉE ici, parce que son plan contient la
+   phrase qui dit la limite du mode (« n'exécutera QUE des capacités de
+   lecture »). C'est le seul endroit où le backend l'écrit ; elle doit être
+   lue avant, pas découverte après. */
+$('btnAsAutoStart').addEventListener('click', function () {
+  destructive({
+    action: 'assistant.autonomie',
+    body: { etat: 'demarrer' },
+    title: 'Activer la surveillance autonome',
+    label: 'Mode autonome',
+    lead: 'ANTI-ZEEVIRIUS va surveiller seul, dans des limites qu\'il ne peut pas franchir. ' +
+          'Voici exactement ce que vous autorisez. Rien n\'est encore activé.',
+    reversible: true,
+    unit: 'réglage',
+    countLabel: 'Changement demandé',
+    planTitle: 'Ce qui change',
+    execLabel: 'Activer la surveillance',
+    revNote: 'Réversible à tout instant : « Arrêter immédiatement » coupe la boucle avant l\'action ' +
+             'suivante, sans attendre la fin du cycle en cours. Le mode n\'exécute que des capacités ' +
+             'de lecture — tout ce qui écrit sur le disque vous est proposé, jamais appliqué.',
+    resultId: 'asAutoResult',
+    onDone: function (data) {
+      var etat = (data && data.result) || {};
+      asPeindreAuto(etat);
+      /* Le premier cycle part immédiatement côté backend : sans cette
+         relecture, le journal resterait vide sous les yeux de l'utilisateur
+         jusqu'au rafraîchissement périodique. */
+      setTimeout(function () { asChargerAuto(true); }, 1500);
+      showResult('asAutoResult', 'ok', 'Surveillance autonome activée',
+        '<p>Un cycle toutes les ' + esc(asSecondes(etat.intervalle)) + ', au plus ' +
+        num(etat.budget) + ' action(s) de lecture par cycle. Tout ce qui écrit sur le disque ' +
+        'apparaîtra dans les suggestions, et n\'en sortira que par votre clic.</p>');
+    }
+  });
+});
+
+/* Arrêt : aucune modale. « Arrêt immédiat » veut dire immédiat — faire lire
+   un plan pour couper une surveillance serait un contresens, et le plan
+   lui-même n'a rien à montrer. Le cycle du contrat est respecté quand même. */
+$('btnAsAutoStop').addEventListener('click', function () {
+  var b = this;
+  b.disabled = true;
+  cycleGuarde('assistant.autonomie', { etat: 'arreter' }).then(function (res) {
+    if (!res.ok) {
+      b.disabled = false;
+      handleFail(res, 'asAutoResult', 'Mode autonome');
+      return;
+    }
+    var etat = (res.data && res.data.result) || {};
+    asPeindreAuto(etat);
+    showResult('asAutoResult', 'warn', 'Surveillance autonome arrêtée',
+      '<p>La boucle est coupée. L\'arrêt a pris effet avant l\'action suivante, sans attendre la fin ' +
+      'du cycle en cours. Le journal ci-dessus reste consultable.</p>');
+    toast('Mode autonome', 'Surveillance arrêtée.', 'warn');
+  });
+});
+
+
+/* ══ 7. CHARGEMENT DE LA SECTION ═════════════════════════════════════════
+   Aucun appel tant que la section n'est pas ouverte : la télémétrie
+   échantillonne à chaque lecture, et sonder une machine que personne ne
+   regarde n'a pas de sens. Le rafraîchissement s'arrête aussi dès que
+   l'onglet passe en arrière-plan.
+   ════════════════════════════════════════════════════════════════════════ */
+var asOuvert = false;
+var asTicks = 0;
+
+function asVisible() {
+  return (location.hash || '').replace(/^#\//, '') === 'assistant' && !document.hidden;
+}
+
+function asRafraichirAssistant(tout) {
+  asChargerTele(true);
+  if (tout) { asChargerNotifs(); asChargerSugg(); asChargerAuto(true); }
+}
+
+function asOuvrirAssistant() {
+  if (!asVisible()) return;
+  if (!asOuvert) {
+    asOuvert = true;
+    asOublierLecture();
+    asRafraichirAssistant(true);
+    return;
+  }
+  asRafraichirAssistant(false);
+}
+
+window.addEventListener('hashchange', asOuvrirAssistant);
+
+/* Télémétrie « en direct » : un relevé toutes les 6 s tant que la section
+   est sous les yeux. Le reste (fil d'alertes, suggestions, journal du mode
+   autonome) suit trois fois moins vite — ces lectures interrogent le
+   système, elles ne doivent pas devenir une charge à elles seules. */
+setInterval(function () {
+  if (!asVisible() || !asOuvert) return;
+  asTicks++;
+  asChargerTele(true);
+  if (asTicks % 3 === 0) { asChargerNotifs(); asChargerAuto(true); }
+  if (asTicks % 6 === 0) asChargerSugg();
+}, 6000);
+
+
+/* ══════════════════════════════════════════════════════════════════════════
    AMORÇAGE
    ══════════════════════════════════════════════════════════════════════════ */
 function boot() {
@@ -2554,6 +3495,9 @@ function boot() {
   loadStatus(true).then(function () {
     if (SCENE) scene(SCENE);
   });
+  /* La section Assistant ne se charge qu'à l'ouverture — y compris
+     lorsque l'URL la désigne d'entrée de jeu. */
+  asOuvrirAssistant();
   /* Rafraîchissement discret de l'état, sans toast ni entrée de journal. */
   setInterval(function () { if (!document.hidden) loadStatus(true); }, 45000);
 }

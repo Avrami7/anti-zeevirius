@@ -79,69 +79,78 @@ CORNER_R = 52.0          # rx du <rect> de fond
 # plus de pointe, elle a une tranche. On rétrécit donc la marque autour de son
 # centre pour lui rendre de l'air, sans toucher à ses proportions.
 MARK_SCALE = 0.88
-CX, CY = 120.0, 118.0    # centre de la sphère
-HALO_CY, HALO_RX, HALO_RY = 122.0, 119.0, 86.0
-SPHERE_R = 44.0
+CX, CY = 120.0, 116.0    # centre de la sphère
+HALO_CX, HALO_CY, HALO_RX, HALO_RY = 102.0, 132.0, 88.0, 50.0
+SPHERE_R = 38.0
 ARC_CX, ARC_CY, ARC_RX, ARC_RY = 120.0, 132.0, 94.0, 62.0
 
-# LES AILES, décrites par leur ossature plutôt que par un tracé figé.
-# Chaque nœud est (x, y_médiane, demi-épaisseur) : le bord supérieur passe à
-# y - m·demi, l'inférieur à y + m·demi, où m est le multiplicateur d'épaisseur
-# propre à chaque taille d'icône (voir TUNING). Décrire l'aile ainsi permet de
-# l'épaissir pour les petites tailles SANS la déformer : une aile dont on
-# remonterait seulement le bord haut cesserait d'être une aile.
+# LE RUBAN DE FACE, décrit par ses deux bords. C'est un TRACÉ CONTINU qui part
+# de la pointe gauche, passe DEVANT la sphère et ressort à droite. Les
+# coordonnées sont celles de `gui/web/index.html`, à l'unité près.
 #
-# Les nœuds intermédiaires sont les points de contrôle des cubiques de
-# favicon.svg ; les valeurs proviennent directement de ce fichier, en prenant
-# la médiane et le demi-écart de chaque paire de points haut/bas.
-WING_SPINE = (
-    (5.0,   135.5, 0.0),    # pointe extérieure : épaisseur nulle
-    (42.0,  131.0, 11.0),   # contrôle : c'est ce nœud qui donne le galbe
-    (76.0,  130.0, 8.0),    # contrôle
-    (105.0, 131.0, 2.0),    # raccord à la sphère
-)
-WING_INNER_X = 135.0        # l'aile traverse le centre jusqu'ici avant de repartir
+# Pourquoi un tracé continu, et pas deux lobes : dessiner un panache à gauche
+# et un filet à droite, chacun à sa hauteur, produit deux rubans qui se
+# télescopent au bord de la sphère. C'est la continuité du trajet qui fait lire
+# une orbite plutôt qu'un décor posé de part et d'autre.
+#
+# Pourquoi il est asymétrique : large et blanc à gauche — le côté qui vient
+# vers l'observateur, amplifié par le décalage Doppler relativiste — il s'affine
+# et vire à l'ambre à droite en remontant. Mesuré sur la référence : masse
+# lumineuse gauche/droite = 1,13, colonne la plus brillante à 40 % de la largeur.
+# Un ruban symétrique se lit comme un anneau de Saturne, quel que soit son galbe.
+RIBBON_TOP = ((8.0, 148.0), (38.0, 142.0), (76.0, 133.0), (120.0, 129.0))
+RIBBON_TOP2 = ((120.0, 129.0), (165.0, 125.0), (201.0, 118.0), (232.0, 111.0))
+RIBBON_BOT = ((232.0, 111.0), (201.0, 128.0), (163.0, 139.0), (120.0, 144.0))
+RIBBON_BOT2 = ((120.0, 144.0), (79.0, 149.0), (38.0, 162.0), (8.0, 148.0))
 
-# LA BANDE incandescente : l'avant du disque passant DEVANT l'horizon.
-# Quadratique, incurvée vers le BAS au centre — l'avant d'une ellipse vue de
-# trois quarts est son point le plus bas.
-BAND = ((48.0, 126.0), (120.0, 140.0), (192.0, 126.0))
+# L'ARC LENSÉ : la face arrière du disque, relevée au-dessus de la sphère par
+# la courbure de l'espace. Il culmine AU-DESSUS DU CENTRE, pas à droite : un arc
+# décentré dessine une amande au lieu de refermer l'anneau autour de l'horizon.
+ARC_A = ((74.0, 128.0), (78.0, 92.0), (104.0, 64.0), (132.0, 66.0))
+ARC_B = ((132.0, 66.0), (164.0, 69.0), (186.0, 88.0), (204.0, 110.0))
 
-# Dégradé des ailes : braise aux pointes, blanc incandescent près de
-# l'horizon. Repris tel quel de favicon.svg (#fWing).
+# LA BANDE : le segment du ruban qui passe devant l'horizon, rehaussé. Elle
+# traverse la sphère à 75 % de sa hauteur — mesure relevée sur la référence.
+# Plus bas elle donnerait un demi-disque blanc, plus haut elle couperait la
+# sphère en deux.
+BAND = ((74.0, 141.0), (120.0, 136.0), (170.0, 129.0))
+
+# Dégradé du disque : le point le plus chaud est à 42 % de la largeur, donc À
+# GAUCHE du centre. Repris tel quel de `gui/web/index.html` (#bhDisk).
 WING_STOPS: Sequence[Tuple[float, str, float]] = (
-    (0.00, "#b8420c", 0.55),
-    (0.16, "#f08324", 0.92),
-    (0.38, "#ffd79a", 1.00),
-    (0.50, "#fffdf6", 1.00),
-    (0.62, "#ffd79a", 1.00),
-    (0.84, "#ef7f20", 0.92),
-    (1.00, "#a8380a", 0.55),
+    (0.00, "#8a3410", 0.00),
+    (0.10, "#e07a22", 0.55),
+    (0.26, "#ffc888", 0.92),
+    (0.42, "#fffaf0", 1.00),
+    (0.55, "#fff0d4", 1.00),
+    (0.70, "#f5a44a", 0.90),
+    (0.86, "#c9541a", 0.55),
+    (1.00, "#6d2606", 0.00),
 )
 
-# Arc de lentille : même famille de teintes, mais translucide — c'est une
-# image déviée, pas de la matière.
-ARC_STOPS: Sequence[Tuple[float, str, float]] = (
-    (0.00, "#a8380a", 0.45),
-    (0.20, "#f4902c", 0.92),
-    (0.50, "#fff6e2", 1.00),
-    (0.80, "#f08324", 0.92),
-    (1.00, "#a8380a", 0.45),
+# L'anneau de photons : lumineux sur TOUT son tour, le plus vif en bas à gauche.
+# Sans lui, la sphère n'est qu'un disque découpé dans le fond — c'est le trait
+# que les versions précédentes de cette icône omettaient.
+RING_STOPS: Sequence[Tuple[float, str, float]] = (
+    (0.00, "#ffffff", 1.00),
+    (0.32, "#fff8ea", 0.92),
+    (0.66, "#ffe9c4", 0.82),
+    (1.00, "#ffc98a", 0.62),
 )
 
-# La bande : le point le plus lumineux de toute l'image.
+ARC_STOPS = WING_STOPS
+
 BAND_STOPS: Sequence[Tuple[float, str, float]] = (
-    (0.00, "#ffcf92", 0.75),
-    (0.28, "#fffefb", 1.00),
-    (0.72, "#fffdf6", 1.00),
-    (1.00, "#ffcf92", 0.75),
+    (0.00, "#ffcf92", 0.55),
+    (0.26, "#ffffff", 1.00),
+    (0.62, "#fffdf6", 1.00),
+    (1.00, "#ffbe72", 0.45),
 )
 
-# Halo radial (rayonnement diffus autour de l'ensemble).
 HALO_STOPS: Sequence[Tuple[float, str, float]] = (
-    (0.00, "#ffb257", 0.40),
-    (0.30, "#ff7a17", 0.26),
-    (0.62, "#c2410c", 0.14),
+    (0.00, "#ffbe6a", 0.20),
+    (0.34, "#ff8420", 0.12),
+    (0.66, "#c2410c", 0.05),
     (1.00, "#7a2408", 0.00),
 )
 
@@ -160,13 +169,13 @@ HALO_STOPS: Sequence[Tuple[float, str, float]] = (
 # L'arc de lentille disparaît sous 32 px : large de 0,9 px, il ne produisait
 # qu'un voile au-dessus de la sphère, sans jamais se lire comme un arc.
 TUNING = {
-    16:  dict(wing=2.6, band=15.0, glow=26.0, arc=0.0,  sphere=52.0, rim=False, halo=1.20, bloom=0.0),
-    24:  dict(wing=2.1, band=11.0, glow=20.0, arc=0.0,  sphere=50.0, rim=False, halo=1.05, bloom=3.0),
-    32:  dict(wing=1.8, band=8.5,  glow=17.0, arc=16.0, sphere=48.0, rim=False, halo=0.95, bloom=5.0),
-    48:  dict(wing=1.4, band=6.0,  glow=13.0, arc=14.5, sphere=46.0, rim=False, halo=0.95, bloom=7.0),
-    64:  dict(wing=1.2, band=4.8,  glow=11.0, arc=13.5, sphere=45.0, rim=True,  halo=1.00, bloom=8.0),
-    128: dict(wing=1.05, band=3.8, glow=9.5,  arc=13.0, sphere=44.0, rim=True,  halo=1.00, bloom=9.0),
-    256: dict(wing=1.0, band=3.4,  glow=9.0,  arc=13.0, sphere=44.0, rim=True,  halo=1.00, bloom=9.8),
+    16:  dict(wing=2.8, band=14.0, glow=24.0, arc=0.0,  sphere=46.0, ring=11.0, halo=1.20, bloom=0.0),
+    24:  dict(wing=2.2, band=10.0, glow=18.0, arc=9.0,  sphere=44.0, ring=8.0,  halo=1.05, bloom=3.0),
+    32:  dict(wing=1.9, band=8.0,  glow=15.0, arc=7.5,  sphere=42.0, ring=6.4,  halo=0.95, bloom=5.0),
+    48:  dict(wing=1.5, band=5.6,  glow=12.0, arc=6.0,  sphere=40.0, ring=4.4,  halo=0.95, bloom=7.0),
+    64:  dict(wing=1.3, band=4.4,  glow=10.0, arc=5.4,  sphere=39.0, ring=3.4,  halo=1.00, bloom=8.0),
+    128: dict(wing=1.08, band=3.2, glow=8.0,  arc=4.9,  sphere=38.0, ring=2.7,  halo=1.00, bloom=9.0),
+    256: dict(wing=1.0, band=2.6,  glow=7.0,  arc=4.6,  sphere=38.0, ring=2.4,  halo=1.00, bloom=9.8),
 }
 
 
@@ -269,31 +278,34 @@ def _bezier(points: Sequence[Tuple[float, float]], steps: int = 64) -> List[Tupl
     return out
 
 
-def _wing_outline(m: float) -> List[Tuple[float, float]]:
-    """Contour fermé des deux ailes, à l'épaisseur multipliée par `m`.
+def _ribbon_outline(m: float, pas: int = 96) -> List[Tuple[float, float]]:
+    """Contour fermé du ruban de face, épaisseur multipliée par `m`.
 
-    On construit l'aile gauche depuis son ossature (bord haut puis bord bas),
-    puis on la reflète autour de x = 120 pour obtenir la droite. Le miroir
-    garantit une marque symétrique : à la main, deux côtés dessinés séparément
-    finissent toujours par diverger de quelques unités, ce qui se voit.
+    Le multiplicateur ne déforme pas le tracé : on calcule la MÉDIANE entre les
+    deux bords, puis on écarte chaque bord de `m` fois sa distance à cette
+    médiane. Épaissir en ne déplaçant qu'un seul bord ferait dériver la
+    trajectoire du ruban, et un ruban qui ne suit plus son orbite ne se lit plus
+    comme une orbite. Nécessaire aux petites tailles : à 16 px, le ruban nominal
+    mesure moins d'un pixel de haut et ne donne qu'une bavure grise.
     """
-    haut = [(x, y - m * d) for x, y, d in WING_SPINE]
-    bas = [(x, y + m * d) for x, y, d in WING_SPINE]
+    haut = _bezier(RIBBON_TOP, pas) + _bezier(RIBBON_TOP2, pas)
+    # Le bord inférieur est décrit de droite à gauche : on le remet dans le sens
+    # du bord supérieur pour pouvoir apparier les points.
+    bas = list(reversed(_bezier(RIBBON_BOT, pas) + _bezier(RIBBON_BOT2, pas)))
 
-    def miroir(pts):
-        return [(2 * CX - x, y) for x, y in pts]
+    n = min(len(haut), len(bas))
+    haut, bas = haut[:n], bas[:n]
+    h2, b2 = [], []
+    for (xh, yh), (xb, yb) in zip(haut, bas):
+        mediane = (yh + yb) / 2
+        h2.append((xh, mediane + (yh - mediane) * m))
+        b2.append((xb, mediane + (yb - mediane) * m))
+    return h2 + list(reversed(b2))
 
-    bord_haut_g = _bezier(haut)
-    bord_bas_g = _bezier(bas)
-    # Sens de parcours : pointe gauche → raccord gauche → raccord droit →
-    # pointe droite → retour par le bord inférieur.
-    contour = list(bord_haut_g)
-    contour.append((WING_INNER_X, haut[-1][1]))
-    contour += miroir(list(reversed(bord_haut_g)))
-    contour += miroir(bord_bas_g)
-    contour.append((2 * CX - WING_INNER_X, bas[-1][1]))
-    contour += list(reversed(bord_bas_g))
-    return contour
+
+def _arc_trace() -> List[Tuple[float, float]]:
+    """Polyligne de l'arc lensé, les deux cubiques mises bout à bout."""
+    return _bezier(ARC_A) + _bezier(ARC_B)[1:]
 
 
 def render(size: int) -> Image.Image:
@@ -330,84 +342,97 @@ def render(size: int) -> Image.Image:
     # 2. Halo diffus.
     if cfg["halo"] > 0:
         img.alpha_composite(_radial_halo(
-            px, cfg["halo"], boite(CX, HALO_CY, HALO_RX, HALO_RY)))
+            px, cfg["halo"], boite(HALO_CX, HALO_CY, HALO_RX, HALO_RY)))
 
-    ailes = ech(_wing_outline(cfg["wing"]))
+    ruban = ech(_ribbon_outline(cfg["wing"]))
+    arc = ech(_arc_trace())
     arc_w = lg(cfg["arc"])
-    arc_box = boite(ARC_CX, ARC_CY, ARC_RX, ARC_RY)
+    sphere_box = boite(CX, CY, cfg["sphere"], cfg["sphere"])
 
-    # 3. Lueur : ailes et arc, flous, posés SOUS les traits nets. C'est ce qui
+    # 3. Lueur : ruban et arc, flous, posés SOUS les tracés nets. C'est ce qui
     #    donne l'incandescence — un tracé net seul paraît dessiné, pas brûlant.
     #    Désactivé à 16 px, où le flou ne ferait que salir.
     if cfg["bloom"] > 0:
         lueur = Image.new("RGBA", (px, px), (0, 0, 0, 0))
-        m, d = _mask(px)
-        d.polygon(ailes, fill=255)
+        m, dr = _mask(px)
+        dr.polygon(ruban, fill=255)
         if arc_w:
-            d.arc(arc_box, 180, 360, fill=200, width=round(arc_w))
+            dr.line(arc, fill=200, width=round(arc_w), joint="curve")
         _paint(lueur, m, WING_STOPS)
         lueur = lueur.filter(ImageFilter.GaussianBlur(cfg["bloom"] * k))
         lueur.putalpha(lueur.getchannel("A").point(lambda a: a * 3 // 4))
         img.alpha_composite(lueur)
 
-    # 4. Arc de lentille gravitationnelle : l'ARRIÈRE du disque, ramené
-    #    au-dessus de la sphère par la courbure de l'espace.
-    if arc_w:
-        m, d = _mask(px)
-        d.arc(arc_box, 180, 360, fill=255, width=round(arc_w))
+    # 4. L'ARC LENSÉ, tracé AVANT la sphère : c'est la face arrière du disque,
+    #    relevée au-dessus de l'horizon par la courbure de l'espace. Elle passe
+    #    donc derrière lui, et la sphère doit l'occulter.
+    if arc_w >= 1:
+        m, dr = _mask(px)
+        dr.line(arc, fill=255, width=round(arc_w), joint="curve")
         _paint(img, m, ARC_STOPS)
 
-    # 5. Les ailes : le disque vu par la tranche. C'est leur envergure —
-    #    beaucoup plus large que la sphère — qui fait lire un trou noir et non
-    #    un anneau.
-    m, d = _mask(px)
-    d.polygon(ailes, fill=255)
+    # 5. La sphère : presque noire, mais PAS noir pur. La référence montre à
+    #    l'intérieur une luminance olive très faible, plus claire vers le
+    #    haut-gauche : c'est l'image de l'arrière du disque, ramenée là par la
+    #    courbure. Du noir pur donne un trou de découpe, pas un horizon.
+    coeur = Image.new("RGBA", (px, px), (0, 0, 0, 0))
+    cd = ImageDraw.Draw(coeur)
+    x0, y0, x1, y1 = sphere_box
+    etapes = 64
+    for i in range(etapes, 0, -1):
+        t = i / etapes
+        # Dégradé décentré vers le haut-gauche, comme sur la référence.
+        cxg = x0 + (x1 - x0) * 0.40
+        cyg = y0 + (y1 - y0) * 0.36
+        r = max(x1 - x0, y1 - y0) / 2 * 0.64 * t
+        v = round(35 * (1 - t) ** 1.2)
+        cd.ellipse((cxg - r, cyg - r, cxg + r, cyg + r), fill=(v, v + 2, max(0, v - 8), 255))
+    decoupe, dd = _mask(px)
+    dd.ellipse(sphere_box, fill=255)
+    fond = Image.new("RGBA", (px, px), (0, 0, 0, 0))
+    ImageDraw.Draw(fond).ellipse(sphere_box, fill=(0, 0, 0, 255))
+    img.alpha_composite(fond)
+    coeur.putalpha(ImageChops.multiply(coeur.getchannel("A"), decoupe))
+    img.alpha_composite(coeur)
+
+    # 6. L'ANNEAU DE PHOTONS, complet. Sur la référence c'est le trait le plus
+    #    net de l'image : la dernière orbite où la lumière rase l'horizon.
+    anneau_w = max(2.0, lg(cfg.get("ring", 2.4)))
+    for largeur, opacite, flou in ((anneau_w * 2.1, 0.34, True), (anneau_w, 1.0, False)):
+        m, dr = _mask(px)
+        dr.ellipse((sphere_box[0] - largeur / 2, sphere_box[1] - largeur / 2,
+                    sphere_box[2] + largeur / 2, sphere_box[3] + largeur / 2),
+                   outline=round(255 * opacite), width=round(largeur))
+        couche = Image.new("RGBA", (px, px), (0, 0, 0, 0))
+        _paint(couche, m, RING_STOPS)
+        if flou:
+            couche = couche.filter(ImageFilter.GaussianBlur(largeur / 2.2))
+        img.alpha_composite(couche)
+
+    # 7. LE RUBAN DE FACE, tracé APRÈS la sphère donc par-dessus : il passe
+    #    DEVANT l'horizon. Puis son segment central est rehaussé — c'est là
+    #    qu'il est le plus incandescent — et découpé au disque de la sphère.
+    m, dr = _mask(px)
+    dr.polygon(ruban, fill=255)
     _paint(img, m, WING_STOPS)
 
-    # 6. La sphère : noir pur, opaque. Aucun dégradé, sinon elle se lit comme
-    #    une planète éclairée.
-    sphere_box = boite(CX, CY, cfg["sphere"], cfg["sphere"])
-    ImageDraw.Draw(img).ellipse(sphere_box, fill=(0, 0, 0, 255))
-
-    # 7. La bande incandescente qui traverse la sphère : l'avant du disque
-    #    passant DEVANT l'horizon. Découpée au disque de la sphère — elle
-    #    déborde volontairement de part et d'autre pour qu'aucune extrémité ne
-    #    soit visible à l'intérieur.
     trace = ech(_bezier(BAND))
     bande = Image.new("RGBA", (px, px), (0, 0, 0, 0))
-
-    # Le voile d'abord, et FLOU : une large ligne nette à 40 % d'opacité ne
-    # donne pas une incandescence mais une barre grise à arêtes franches —
-    # c'est le défaut qui faisait ressembler la bande à un morceau de métal.
     if lg(cfg["glow"]) >= 1:
         voile = Image.new("RGBA", (px, px), (0, 0, 0, 0))
-        m, d = _mask(px)
-        d.line(trace, fill=115, width=round(lg(cfg["glow"])), joint="curve")
+        m, dr = _mask(px)
+        dr.line(trace, fill=95, width=round(lg(cfg["glow"])), joint="curve")
         _paint(voile, m, BAND_STOPS)
-        flou = max(1.0, lg(cfg["glow"]) / 2.4)
-        bande.alpha_composite(voile.filter(ImageFilter.GaussianBlur(flou)))
-
-    # Puis le cœur, net : c'est lui qu'on doit lire comme un trait.
+        bande.alpha_composite(voile.filter(
+            ImageFilter.GaussianBlur(max(1.0, lg(cfg["glow"]) / 2.4))))
     if lg(cfg["band"]) >= 1:
-        m, d = _mask(px)
-        d.line(trace, fill=247, width=round(lg(cfg["band"])), joint="curve")
+        m, dr = _mask(px)
+        dr.line(trace, fill=243, width=round(lg(cfg["band"])), joint="curve")
         _paint(bande, m, BAND_STOPS)
-    decoupe, dc = _mask(px)
-    dc.ellipse(sphere_box, fill=255)
     bande.putalpha(ImageChops.multiply(bande.getchannel("A"), decoupe))
     img.alpha_composite(bande)
 
-    # 8. Liseré de l'horizon : la dernière orbite stable, là où la lumière
-    #    rase la sphère. Trop fin pour exister sous 64 px.
-    if cfg["rim"]:
-        rim_w = max(2.0, 0.9 * k)
-        ImageDraw.Draw(img).ellipse(
-            (sphere_box[0] - rim_w / 2, sphere_box[1] - rim_w / 2,
-             sphere_box[2] + rim_w / 2, sphere_box[3] + rim_w / 2),
-            outline=(255, 207, 146, 77), width=round(rim_w),
-        )
-
-    # 9. Coins arrondis : on découpe la couche alpha finale, sinon le halo
+    # 8. Coins arrondis : on découpe la couche alpha finale, sinon le halo
     #    déborderait dans les angles transparents.
     corner, cd = _mask(px)
     cd.rounded_rectangle((0, 0, px - 1, px - 1), radius=CORNER_R * k, fill=255)

@@ -38,7 +38,10 @@ var C = {
   ember:   '#b8380a',
   aurora1: 'rgba(64,196,168,',   // vert-turquoise
   aurora2: 'rgba(120,132,236,',  // violet froid
-  aurora3: 'rgba(238,140,52,'    // rappel ambré, lie l'aurore à la charte
+  aurora3: 'rgba(238,140,52,',   // rappel ambré, lie l'aurore à la charte
+  mwPale:  '212,226,255',        // bleu-blanc des populations stellaires jeunes
+  mwWarm:  '255,226,186',        // coeur galactique, plus chaud
+  mwDust:  '10,6,14'             // bande d'absorption : de la poussière, pas du vide
 };
 
 var W = 0, H = 0, DPR = 1;
@@ -51,6 +54,16 @@ var W = 0, H = 0, DPR = 1;
 var AURORA_SCALE = 0.30;
 var auroraCv = document.createElement('canvas');
 var auroraCtx = auroraCv.getContext('2d');
+
+/* Voie lactée : STATIQUE, donc dessinée UNE SEULE FOIS par redimensionnement
+   sur son propre canevas, puis recopiée telle quelle à chaque image. Une
+   galaxie ne bouge pas à l'échelle d'une session, et recalculer ses ~1100
+   étoiles à 60 images par seconde coûterait plus cher que tout le reste de la
+   scène réuni. Demi-résolution : la bande est diffuse, personne ne verra la
+   différence, et l'agrandissement lisse le grain plutôt que de le révéler. */
+var MW_SCALE = 0.5;
+var mwCv = document.createElement('canvas');
+var mwCtx = mwCv.getContext('2d');
 var stars = [], planets = [], rocks = [], shooters = [], auroras = [];
 var hole = { x: 0, y: 0, r: 0 };
 var t0 = performance.now();
@@ -72,6 +85,7 @@ function build() {
 
   auroraCv.width = Math.max(1, Math.round(W * AURORA_SCALE));
   auroraCv.height = Math.max(1, Math.round(H * AURORA_SCALE));
+  buildMilkyWay();
 
   // Le trou noir est décentré : il doit rester lisible sans se placer
   // derrière la colonne de contenu principale.
@@ -159,6 +173,102 @@ function newShooter() {
   };
 }
 
+/* ── La Voie lactée ─────────────────────────────────────────────────────────
+   Trois couches, dans l'ordre où l'œil les lit :
+
+   1. la LUEUR diffuse de la bande, en dégradé perpendiculaire à son axe ;
+   2. la BANDE DE POUSSIÈRE qui la coupe en deux sur presque toute sa
+      longueur — c'est ce détail qui fait reconnaître la Voie lactée plutôt
+      qu'un simple nuage lumineux, et c'est celui qu'on oublie ;
+   3. les ÉTOILES, réparties en loi normale autour de l'axe : une répartition
+      uniforme donnerait un rectangle d'étoiles, pas un disque vu par la
+      tranche. La densité décroît donc en s'éloignant de l'axe.
+
+   L'axe est incliné et décalé vers le bas pour passer SOUS la colonne de
+   contenu : une bande lumineuse derrière du texte le rend illisible.
+*/
+function buildMilkyWay() {
+  var k = MW_SCALE;
+  mwCv.width = Math.max(1, Math.round(W * k));
+  mwCv.height = Math.max(1, Math.round(H * k));
+  var g = mwCtx;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(0, 0, mwCv.width, mwCv.height);
+
+  var ANGLE = -0.38;                 // ~22 degrés, montant vers la droite
+  var cx = W * 0.42 * k, cy = H * 0.70 * k;
+  var longueur = Math.hypot(W, H) * 1.25 * k;
+  var epaisseur = Math.min(W, H) * 0.30 * k;
+
+  g.save();
+  g.translate(cx, cy);
+  g.rotate(ANGLE);
+
+  // 1. Lueur : dégradé perpendiculaire, éteint aux deux bords pour qu'aucune
+  //    arête n'apparaisse.
+  var lueur = g.createLinearGradient(0, -epaisseur, 0, epaisseur);
+  lueur.addColorStop(0.00, 'rgba(' + C.mwPale + ',0)');
+  lueur.addColorStop(0.30, 'rgba(' + C.mwPale + ',0.030)');
+  lueur.addColorStop(0.50, 'rgba(' + C.mwWarm + ',0.055)');
+  lueur.addColorStop(0.70, 'rgba(' + C.mwPale + ',0.030)');
+  lueur.addColorStop(1.00, 'rgba(' + C.mwPale + ',0)');
+  g.fillStyle = lueur;
+  g.fillRect(-longueur / 2, -epaisseur, longueur, epaisseur * 2);
+
+  // Renflement central : le bulbe galactique. Sans lui la bande est un ruban
+  // d'épaisseur constante, ce qui ne ressemble à aucune galaxie.
+  var bulbe = g.createRadialGradient(0, 0, 0, 0, 0, epaisseur * 1.5);
+  bulbe.addColorStop(0.00, 'rgba(' + C.mwWarm + ',0.075)');
+  bulbe.addColorStop(0.55, 'rgba(' + C.mwWarm + ',0.028)');
+  bulbe.addColorStop(1.00, 'rgba(' + C.mwWarm + ',0)');
+  g.fillStyle = bulbe;
+  g.fillRect(-epaisseur * 1.5, -epaisseur * 1.5, epaisseur * 3, epaisseur * 3);
+
+  // 2. Bande de poussière : elle ABSORBE, donc elle s'écrit en 'source-over'
+  //    par-dessus la lueur, et ondule légèrement — une ligne droite ferait
+  //    mécanique.
+  g.globalCompositeOperation = 'source-over';
+  var pas = Math.max(6, longueur / 60);
+  var epD = epaisseur * 0.22;
+  var dust = g.createLinearGradient(0, -epD * 2, 0, epD * 2);
+  dust.addColorStop(0.00, 'rgba(' + C.mwDust + ',0)');
+  dust.addColorStop(0.50, 'rgba(' + C.mwDust + ',0.55)');
+  dust.addColorStop(1.00, 'rgba(' + C.mwDust + ',0)');
+  g.fillStyle = dust;
+  g.beginPath();
+  g.moveTo(-longueur / 2, 0);
+  for (var x = -longueur / 2; x <= longueur / 2 + pas; x += pas) {
+    g.lineTo(x, Math.sin(x * 0.004) * epD * 0.7 - epD);
+  }
+  for (var x2 = longueur / 2 + pas; x2 >= -longueur / 2; x2 -= pas) {
+    g.lineTo(x2, Math.sin(x2 * 0.004) * epD * 0.7 + epD);
+  }
+  g.closePath();
+  g.fill();
+
+  // 3. Étoiles. La somme de deux tirages uniformes approche une loi normale
+  //    (théorème central limite, ordre 2) : assez pour concentrer la densité
+  //    sur l'axe sans le coût d'un vrai tirage gaussien.
+  var n = Math.round(Math.min(1100, Math.max(260, W * H / 1700)));
+  for (var i = 0; i < n; i++) {
+    var u = (Math.random() + Math.random() - 1);
+    var px = (Math.random() - 0.5) * longueur;
+    var py = u * epaisseur * 0.85;
+    // Plus on s'éloigne de l'axe, plus l'étoile est faible : la bande se fond
+    // dans le ciel au lieu de s'y découper.
+    var att = 1 - Math.min(1, Math.abs(py) / (epaisseur * 0.85));
+    var a = (0.10 + Math.random() * 0.42) * (0.25 + att * 0.75);
+    // Les étoiles les plus proches du bulbe tirent vers le chaud.
+    var chaude = Math.abs(px) < epaisseur * 1.6 && Math.random() < 0.45;
+    g.fillStyle = 'rgba(' + (chaude ? C.mwWarm : C.mwPale) + ',' + a.toFixed(3) + ')';
+    var r = (0.22 + Math.random() * 0.62) * k;
+    g.beginPath();
+    g.arc(px, py, r, 0, Math.PI * 2);
+    g.fill();
+  }
+  g.restore();
+}
+
 /* ── Rendu : fond et aurore ─────────────────────────────────────────────── */
 function drawBackdrop(tt) {
   var g = ctx.createLinearGradient(0, 0, W * 0.35, H);
@@ -166,6 +276,13 @@ function drawBackdrop(tt) {
   g.addColorStop(1, C.void0);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
+
+  // Voie lactée : une seule recopie, la bande est pré-calculée. 'lighter' pour
+  // qu'elle s'ajoute au fond sans l'occulter — de la lumière, pas un calque.
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.drawImage(mwCv, 0, 0, W, H);
+  ctx.restore();
 
   // Aurore : rubans sinusoïdaux superposés, dégradés verticalement pour
   // s'éteindre par le haut et par le bas (pas de bord net).

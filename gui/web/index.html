@@ -138,97 +138,33 @@
   <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.3" r="3.6"/><path d="M4.9 20.1a7.1 7.1 0 0 1 14.2 0"/></symbol>
 
   <!-- ══ La marque : trou noir et son disque d'accrétion ══ -->
-  <symbol id="blackhole" viewBox="0 0 240 240">
-    <!-- LA MARQUE — d'apres docs/identite/reference-trou-noir.png (normative).
-         Echelle : rayon de sphere 75 px sur la photo -> 38 unites ici.
+  <symbol id="blackhole" viewBox="0 0 240 170">
+    <!-- LA MARQUE — la PHOTOGRAPHIE de reference ENTIERE, et non un dessin.
 
-         TROIS ERREURS CORRIGEES, dans l'ordre ou elles ont ete trouvees en
-         comparant le rendu a la photo :
+         Cinq versions vectorielles ont ete rejetees par le proprietaire. La
+         cause n'etait pas le trace mais le principe : une photographie de trou
+         noir porte du volume, des filaments et du grain. Un chemin SVG ne sait
+         pas les imiter — il en fait une illustration, et une illustration de
+         trou noir se lit comme un anneau de Saturne.
 
-         1. Des ellipses concentriques donnent SATURNE. La reference n'a aucun
-            anneau : elle a une face avant, une face arriere, et l'anneau de
-            photons. Rien d'autre.
-         2. La face avant est UN SEUL RUBAN CONTINU. Dessiner un panache a
-            gauche et un filet a droite, chacun a sa hauteur, produit deux
-            rubans qui se telescopent au bord de la sphere. Ici un unique trace
-            part de la pointe gauche, passe DEVANT la sphere et ressort a
-            droite : c'est la continuite qui fait lire une orbite.
-         3. Le ruban est ASYMETRIQUE. Large et blanc a gauche — le cote qui
-            vient vers l'observateur, amplifie par le decalage Doppler — il
-            s'affine et vire a l'ambre a droite en remontant. Un ruban
-            symetrique se lit comme un anneau, quel que soit son galbe. -->
+         Une sixieme version, recadree en carre autour de la sphere, a ete
+         rejetee aussi, et a juste titre : le recadrage supprimait le panache
+         blanc de gauche et le fond etoile. Or ils font partie du sujet. Le
+         resultat n'etait plus « la photo » mais un gros plan.
 
-    <g class="bh-halo"><ellipse cx="102" cy="132" rx="88" ry="50" fill="url(#bhHalo)"/></g>
-    <g class="bh-stars">
-      <circle cx="26" cy="34" r=".9"/><circle cx="214" cy="42" r="1"/>
-      <circle cx="202" cy="200" r=".8"/><circle cx="32" cy="204" r="1"/>
-      <circle cx="122" cy="14" r=".7"/><circle cx="12" cy="150" r=".8"/>
-      <circle cx="228" cy="124" r=".7"/><circle cx="68" cy="24" r=".7"/>
-    </g>
+         D'ou le viewBox 240x170 : c'est le ratio de la photographie
+         (960x681). Un viewBox carre imposerait de rogner ou de deformer.
 
-    <!-- ── FACE ARRIERE : l'arc lense au-dessus de la sphere. Fin et pres
-         d'elle : sur la reference il effleure l'horizon, il ne l'enjambe pas
-         en pont. -->
-    <g class="bh-back">
-      <path d="M74 128 C 78 92, 104 64, 132 66 C 164 69, 186 88, 204 110"
-            fill="none" stroke="url(#bhDisk)" stroke-width="12" opacity=".26"
-            filter="url(#bhWide)"/>
-      <path d="M74 128 C 78 92, 104 64, 132 66 C 164 69, 186 88, 204 110"
-            fill="none" stroke="url(#bhDisk)" stroke-width="4.6"
-            stroke-linecap="round"/>
-      <path class="bh-backl"
-            d="M79 127 C 83 97, 106 72, 131 74 C 159 77, 180 93, 197 112"
-            fill="none" stroke="url(#bhStrand)" stroke-width="1.4" opacity=".55"/>
-      <path class="bh-orbit-b"
-            d="M74 128 C 78 92, 104 64, 132 66 C 164 69, 186 88, 204 110"
-            fill="none" stroke="url(#bhHot)" stroke-width="2.6" stroke-linecap="round"
-            stroke-dasharray="20 240" opacity=".8"/>
-    </g>
+         Source : docs/identite/reference-trou-noir.png, fournie par le
+         proprietaire et versionnee. Ressources fabriquees par
+         packaging/make_logo.py — ne pas editer les fichiers generes a la main.
 
-    <!-- ── LA SPHERE ─────────────────────────────────────────────────────── -->
-    <circle class="bh-shadow" cx="120" cy="116" r="38" fill="url(#bhCore)"/>
+         Le halo anime reste un calque SVG dessous : c'est lui qui pulse quand
+         une analyse tourne, la photographie ne bouge pas. -->
 
-    <!-- Anneau de photons : COMPLET, lumineux sur tout son tour. C'est le
-         trait le plus net de la reference ; sans lui la sphere n'est qu'un
-         disque decoupe dans le fond. -->
-    <circle cx="120" cy="116" r="40.6" fill="none" stroke="url(#bhRing)"
-            stroke-width="5" opacity=".34" filter="url(#bhSoft)"/>
-    <circle class="bh-photon" cx="120" cy="116" r="38.8" fill="none"
-            stroke="url(#bhRing)" stroke-width="2.4"/>
-
-    <!-- ── FACE AVANT : le ruban continu, trace APRES la sphere donc devant.
-         Large de 20 unites a la pointe gauche, 13 devant la sphere, 6 a la
-         pointe droite. -->
-    <g class="bh-front">
-      <path class="bh-bloom"
-            d="M6 147 C 36 141, 76 131, 120 127 C 166 123, 202 116, 234 109
-               C 202 130, 164 141, 120 146 C 78 151, 36 164, 6 147 Z"
-            fill="url(#bhDisk)" opacity=".38" filter="url(#bhWide)"/>
-      <path d="M8 148 C 38 142, 76 133, 120 129 C 165 125, 201 118, 232 111
-               C 201 128, 163 139, 120 144 C 79 149, 38 162, 8 148 Z"
-            fill="url(#bhDisk)"/>
-      <!-- Brins : la matiere est filamenteuse, pas un ruban imprime. -->
-      <path d="M18 150 C 46 145, 80 137, 120 133 C 160 129, 196 122, 226 115"
-            fill="none" stroke="url(#bhStrand)" stroke-width="1.5" opacity=".65"/>
-      <path d="M20 155 C 50 151, 84 143, 120 138 C 156 133, 192 126, 220 119"
-            fill="none" stroke="url(#bhStrand)" stroke-width="1" opacity=".42"/>
-
-      <!-- Le ruban est le plus incandescent la ou il passe devant l'horizon :
-           on rehausse ce seul segment, decoupe au disque de la sphere. -->
-      <g clip-path="url(#bhSphere)">
-        <path d="M74 142 Q 120 137, 170 130" fill="none" stroke="url(#bhBand)"
-              stroke-width="14" opacity=".32" filter="url(#bhSoft)"/>
-        <path d="M74 141 Q 120 136, 170 130" fill="none" stroke="url(#bhBand)"
-              stroke-width="6.5" opacity=".85" filter="url(#bhSoft)"/>
-        <path class="bh-frontl" d="M74 141 Q 120 136, 170 129" fill="none"
-              stroke="#fffefa" stroke-width="2.4" opacity=".95"/>
-      </g>
-
-      <path class="bh-orbit-f"
-            d="M10 152 C 40 147, 76 138, 120 134 C 164 130, 200 122, 230 114"
-            fill="none" stroke="url(#bhHot)" stroke-width="3.4" stroke-linecap="round"
-            stroke-dasharray="24 290" opacity=".85"/>
-    </g>
+    <g class="bh-halo"><ellipse cx="120" cy="85" rx="122" ry="76" fill="url(#bhHalo)"/></g>
+    <image class="bh-photo" href="logo-trou-noir.webp" x="0" y="0"
+           width="240" height="170" preserveAspectRatio="xMidYMid meet"/>
   </symbol>
 </svg>
 
@@ -237,7 +173,7 @@
 
 <header class="topbar">
   <div class="brand">
-    <span class="brand-mark bh bh-xs" aria-hidden="true"><svg viewBox="0 0 240 240"><use href="#blackhole"/></svg></span>
+    <span class="brand-mark bh bh-xs" aria-hidden="true"><svg viewBox="0 0 240 170"><use href="#blackhole"/></svg></span>
     <span class="brand-txt">
       <b>ANTI<i>·</i>ZEEVIRIUS</b>
       <small>Dashboard</small>
@@ -320,7 +256,7 @@
       <article class="panel panel-hero span-2" id="heroPanel">
         <div class="hero-grid">
           <div class="hero-vis">
-            <span class="bh bh-lg" id="heroBh" aria-hidden="true"><svg viewBox="0 0 240 240"><use href="#blackhole"/></svg></span>
+            <span class="bh bh-lg" id="heroBh" aria-hidden="true"><svg viewBox="0 0 240 170"><use href="#blackhole"/></svg></span>
             <svg class="score" viewBox="0 0 260 260" aria-hidden="true">
               <circle class="score-bg" cx="130" cy="130" r="122"/>
               <circle class="score-fg" id="scoreRing" cx="130" cy="130" r="122"/>
@@ -473,7 +409,7 @@
           </div>
 
           <div class="jobline" id="asCmdJob" hidden>
-            <span class="bh bh-xs jobbh"><svg viewBox="0 0 240 240"><use href="#blackhole"/></svg></span>
+            <span class="bh bh-xs jobbh"><svg viewBox="0 0 240 170"><use href="#blackhole"/></svg></span>
             <div class="jobline-txt"><b id="asCmdJobTitle">Exécution…</b><span id="asCmdJobCurrent">—</span></div>
           </div>
 
@@ -604,7 +540,7 @@
 
           <div class="scanhud" id="scanHud" data-state="idle">
             <div class="scanhud-vis">
-              <span class="bh bh-md" id="scanBh" aria-hidden="true"><svg viewBox="0 0 240 240"><use href="#blackhole"/></svg></span>
+              <span class="bh bh-md" id="scanBh" aria-hidden="true"><svg viewBox="0 0 240 170"><use href="#blackhole"/></svg></span>
               <svg class="score score-scan" viewBox="0 0 260 260" aria-hidden="true">
                 <circle class="score-bg" cx="130" cy="130" r="122"/>
                 <circle class="score-fg" id="scanRing" cx="130" cy="130" r="122"/>
@@ -954,7 +890,7 @@
             </div>
           </div>
           <div class="jobline" id="diskJob" hidden>
-            <span class="bh bh-xs jobbh"><svg viewBox="0 0 240 240"><use href="#blackhole"/></svg></span>
+            <span class="bh bh-xs jobbh"><svg viewBox="0 0 240 170"><use href="#blackhole"/></svg></span>
             <div class="jobline-main">
               <div class="bar"><i id="diskBar" style="width:0%"></i></div>
               <p class="jobline-txt"><span id="diskCurrent">—</span><b class="num" id="diskPct">0 %</b></p>
@@ -980,7 +916,7 @@
         </header>
         <div class="p-body">
           <div class="jobline" id="appsJob" hidden>
-            <span class="bh bh-xs jobbh"><svg viewBox="0 0 240 240"><use href="#blackhole"/></svg></span>
+            <span class="bh bh-xs jobbh"><svg viewBox="0 0 240 170"><use href="#blackhole"/></svg></span>
             <div class="jobline-main">
               <div class="bar"><i id="appsBar" style="width:0%"></i></div>
               <p class="jobline-txt"><span id="appsCurrent">—</span><b class="num" id="appsPct">0 %</b></p>
@@ -1032,7 +968,7 @@
             </div>
           </div>
           <div class="jobline" id="triageJob" hidden>
-            <span class="bh bh-xs jobbh"><svg viewBox="0 0 240 240"><use href="#blackhole"/></svg></span>
+            <span class="bh bh-xs jobbh"><svg viewBox="0 0 240 170"><use href="#blackhole"/></svg></span>
             <div class="jobline-main">
               <div class="bar"><i id="triageBar" style="width:0%"></i></div>
               <p class="jobline-txt"><span id="triageCurrent">—</span><b class="num" id="triagePct">0 %</b></p>
@@ -1212,7 +1148,7 @@
             <button class="btn btn-ghost" type="button" id="btnGdPending">Voir la file d'attente</button>
           </div>
           <div class="jobline" id="gdJob" hidden>
-            <span class="bh bh-xs jobbh"><svg viewBox="0 0 240 240"><use href="#blackhole"/></svg></span>
+            <span class="bh bh-xs jobbh"><svg viewBox="0 0 240 170"><use href="#blackhole"/></svg></span>
             <div class="jobline-main">
               <div class="bar"><i id="gdBar" style="width:0%"></i></div>
               <p class="jobline-txt"><span id="gdCurrent">—</span><b class="num" id="gdPct">0 %</b></p>

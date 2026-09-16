@@ -20,3 +20,13 @@ runtime.json
 history/
 incident/
 camera/
+
+# État d'exécution de la couche assistant. En développement, paths.data_path()
+# retombe volontairement sur le dossier du projet (voir paths.py) : la mémoire,
+# le journal des décisions et les notifications s'écrivent donc ICI. Ce sont des
+# données d'une session, pas des sources — et elles peuvent contenir des chemins
+# personnels et l'historique d'usage de la machine. Elles ne doivent jamais
+# partir sur un dépôt public.
+assistant/memoire.json
+assistant/notifications.json
+assistant/*.json

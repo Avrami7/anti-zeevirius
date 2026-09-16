@@ -209,7 +209,7 @@
   <div class="rail-grp">
     <p class="rail-lbl">Supervision</p>
     <a class="rail-i" href="#/tableau-de-bord" data-view="tableau-de-bord"><svg class="ic"><use href="#i-gauge"/></svg><span>Tableau de bord</span></a>
-    <a class="rail-i" href="#/assistant" data-view="assistant"><svg class="ic"><use href="#i-radar"/></svg><span>Assistant</span><em class="rail-n">5</em></a>
+    <a class="rail-i" href="#/assistant" data-view="assistant"><svg class="ic"><use href="#i-radar"/></svg><span>Assistant</span><em class="rail-n">6</em></a>
     <a class="rail-i" href="#/historique" data-view="historique"><svg class="ic"><use href="#i-undo"/></svg><span>Historique</span><em class="rail-n">1</em></a>
   </div>
   <div class="rail-grp">
@@ -511,6 +511,141 @@
           <p class="lbl">Journal des actions</p>
           <div class="tbl" id="asAutoJournal"><p class="empty">Aucun cycle exécuté.</p></div>
           <div class="result" id="asAutoResult" hidden></div>
+        </div>
+      </article>
+
+      <!-- ── Voix : PROMÉTHÉE, ÉPIMÉTHÉE, JUANITA JCV ────────────────────
+           Trois personas, UN moteur, UNE file. Le panneau est construit
+           autour d'un seul principe : une voix qu'on ne peut pas faire
+           taire tout de suite est insupportable — dans un bureau partagé,
+           c'est un vrai problème. D'où la barre SILENCE en tête du corps,
+           collante au défilement, seule et globale : quelqu'un qui veut le
+           silence le veut entièrement, pas voix par voix.
+
+           Les trois cartes sont peintes par app.js (vxRendreCartes) depuis
+           un gabarit unique : trois blocs recopiés à la main divergeraient
+           au premier réglage ajouté. Et elles s'affichent même quand le
+           moteur vocal répond « indisponible » — un panneau vide
+           n'explique rien. ────────────────────────────────────────────── -->
+      <article class="panel span-4 panel-voix" id="pAssistVoix">
+        <header class="p-head">
+          <h3><svg class="ic"><use href="#i-alert"/></svg> Voix — annonces parlées</h3>
+          <span class="tag tag-soft">Elle parle, elle n'écoute pas</span>
+          <span class="statelamp" id="vxLamp" data-on="false" title="Moteur vocal disponible"></span>
+          <button class="linkbtn" type="button" id="btnVxEtat">Actualiser</button>
+        </header>
+        <div class="p-body">
+
+          <!-- Barre de silence + état en direct. Le bouton n'est jamais
+               désactivé : même moteur indisponible, le geste doit répondre
+               quelque chose plutôt que rester inerte sous le doigt. -->
+          <div class="vx-bar" id="vxBar" data-parle="false">
+            <button class="btn vx-mute" type="button" id="btnVxSilence"
+                    title="Coupe immédiatement les trois voix et vide la file d'attente">
+              <svg class="ic"><use href="#i-close"/></svg>
+              <span class="vx-mute-t">SILENCE</span>
+              <small>coupe les trois voix, tout de suite</small>
+            </button>
+
+            <div class="vx-live">
+              <p class="vx-live-l">En ce moment</p>
+              <b class="vx-live-v" id="vxQui">Silencieuse</b>
+              <p class="vx-live-m" id="vxQuoi">Aucune annonce en cours.</p>
+            </div>
+
+            <div class="vx-file">
+              <b class="num" id="vxFile">—</b>
+              <span>annonces<br>en attente</span>
+            </div>
+          </div>
+
+          <p class="p-note" id="vxDispoNote">Lecture de l'état du moteur vocal…</p>
+
+          <!-- Les trois personas, même gabarit, réglages indépendants. -->
+          <div class="vx-cards" id="vxCards"></div>
+
+          <!-- Règle d'interruption : une coupure au milieu d'un bilan
+               ressemble à un bug si personne ne l'a annoncée avant. -->
+          <div class="warnbox vx-prio">
+            <p class="warnbox-h">Qui coupe qui — lisez-le avant de l'entendre</p>
+            <ul>
+              <li><b>La file est unique et partagée</b> : deux voix ne parlent jamais en même temps,
+                quel que soit le nombre d'annonces en attente.</li>
+              <li><b>PROMÉTHÉE peut couper ÉPIMÉTHÉE en pleine phrase</b> quand l'alerte est grave.
+                Un bilan interrompu net n'est donc pas une panne : c'est une urgence qui passe devant.</li>
+              <li><b>Jamais l'inverse.</b> ÉPIMÉTHÉE et JUANITA JCV attendent leur tour, toujours :
+                un compte rendu ne coupe pas une alerte.</li>
+            </ul>
+          </div>
+
+          <!-- ── Règles de la maison : globales, pas par voix ─────────── -->
+          <p class="vx-rules-h">Règles de la maison — elles valent pour les trois voix</p>
+          <p class="p-note">Le niveau de confidentialité et les heures de silence ne sont pas des
+            préférences de voix : ce sont des règles de la pièce où la machine parle. Elles
+            s'appliquent donc aux trois personas d'un bloc, et il n'y a pas de réglage par voix pour
+            les contredire.</p>
+
+          <!-- Confidentialité -->
+          <section class="vx-rule" id="vxConfBloc" aria-labelledby="vxConfH">
+            <header class="vx-rule-h">
+              <h4 id="vxConfH"><svg class="ic"><use href="#i-lock"/></svg> Niveau de confidentialité</h4>
+              <span class="chip" id="vxVerbChip" data-tone="ok">discrète</span>
+            </header>
+
+            <p class="vx-why"><b>Pourquoi ce réglage existe :</b> une voix est entendue par tout le
+              monde dans la pièce. Un écran, on le retourne ; une phrase prononcée à voix haute, non.
+              Un collègue qui passe, un appel visio ouvert, un salon avec des invités — ce que la voix
+              nomme sort de votre machine et entre dans la pièce. Le chemin d'un fichier, le nom de
+              votre session, l'adresse de votre poste : ce réglage décide de ce qui franchit ce pas,
+              et de ce qui reste à l'écran.</p>
+
+            <div class="seg" id="vxVerbSeg" role="tablist" aria-label="Niveau de confidentialité des annonces">
+              <button class="seg-i is-on" type="button" data-vxverb="discrete" role="tab" aria-selected="true">Discrète</button>
+              <button class="seg-i" type="button" data-vxverb="normale" role="tab" aria-selected="false">Normale</button>
+              <button class="seg-i" type="button" data-vxverb="complete" role="tab" aria-selected="false">Complète</button>
+            </div>
+
+            <!-- La même menace, annoncée aux trois niveaux : c'est la seule
+                 explication qui se comprenne sans y réfléchir. -->
+            <div class="vx-niv" id="vxNiveaux"></div>
+          </section>
+
+          <!-- Heures de silence -->
+          <section class="vx-rule" id="vxHeuresBloc" aria-labelledby="vxHeuresH">
+            <header class="vx-rule-h">
+              <h4 id="vxHeuresH"><svg class="ic"><use href="#i-clock"/></svg> Heures de silence</h4>
+              <span class="chip" id="vxHeuresChip" data-tone="info">désactivées</span>
+            </header>
+
+            <div class="vx-hrs">
+              <div class="vx-sw-row">
+                <button class="vx-sw" type="button" role="switch" aria-checked="false" id="btnVxHeures"
+                        aria-label="Activer la plage de silence"><i></i></button>
+                <span class="vx-sw-t" id="vxHeuresTxt">Plage désactivée — les voix parlent à toute heure</span>
+              </div>
+              <label class="vx-hr"><span class="lbl">Début</span>
+                <input class="inp vx-time" type="time" id="vxHeureDebut" value="22:00"></label>
+              <label class="vx-hr"><span class="lbl">Fin</span>
+                <input class="inp vx-time" type="time" id="vxHeureFin" value="07:00"></label>
+              <button class="btn btn-ghost btn-sm" type="button" id="btnVxHeuresApp">Appliquer la plage</button>
+            </div>
+            <p class="p-note">Une plage qui passe minuit est acceptée telle quelle : de 22:00 à 07:00
+              couvre la nuit, pas la journée.</p>
+
+            <div class="vx-exc">
+              <p class="vx-exc-h">L'exception, et elle est voulue</p>
+              <p>Une <b>alerte critique passe malgré la plage</b> : menace active, caméra ou microphone
+                ouverts sans votre accord, intrusion en cours, entrée en Mode Incident. Une plage de
+                silence qui bâillonnerait aussi l'urgence ne serait pas un confort, ce serait un risque
+                — l'utilité de cette voix est justement de vous prévenir quand vous ne regardez pas
+                l'écran.</p>
+              <p>Ce droit n'appartient qu'à <b>PROMÉTHÉE</b>. Pendant la plage, <b>ÉPIMÉTHÉE</b> et
+                <b>JUANITA JCV</b> se taisent pour de bon : leurs bilans et leurs points d'avancement
+                attendent la fin de la plage, ils ne sont pas perdus.</p>
+            </div>
+          </section>
+
+          <div class="result" id="vxResult" hidden></div>
         </div>
       </article>
     </div>

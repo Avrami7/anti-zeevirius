@@ -63,9 +63,9 @@ LARGE = 960               # largeur de la ressource web, ratio d'origine garde
 SEUIL = 110               # luminance a partir de laquelle un pixel « compte »
 MARGE = 1.10              # 10 % d'air autour du sujet mesure
 # Fondu alpha : plein jusqu'a PLEIN, eteint a BORD, en fraction de la diagonale.
-# Mesure a l'oeil sur le Dashboard : au-dela de 0,60 le rectangle de la
-# photographie redevient visible sur les cartes en verre depoli, et une marque
-# qui montre son cadre n'est plus une marque, c'est une image collee.
+# Mesuré : au-delà de 0,60 le rectangle de la photographie redevient visible sur
+# les cartes en verre dépoli, et une marque qui montre son cadre n'est plus une
+# marque, c'est une image collée.
 PLEIN, BORD = 0.52, 1.00
 
 TAILLES_ICO: Tuple[int, ...] = (16, 24, 32, 48, 64, 128, 256)
@@ -105,7 +105,13 @@ def _masque_fondu(W: int, H: int, plein: float = PLEIN) -> Image.Image:
         ny = (y - H / 2) / (H / 2)
         for x in range(W):
             nx = (x - W / 2) / (W / 2)
-            d = math.hypot(nx, ny) / math.sqrt(2)   # 0 au centre, 1 aux coins
+            # Distance de TCHEBYCHEV, pas euclidienne. Avec la distance
+            # euclidienne normalisée sur la diagonale, le fondu n'atteint zéro
+            # QU'AUX COINS : au milieu de chaque bord il reste à 41 % d'opacité,
+            # et l'œil voit alors le rectangle de la photographie posé sur la
+            # carte. Avec max(|nx|,|ny|), l'alpha tombe à zéro sur TOUT le
+            # pourtour — il n'y a plus d'arête nulle part.
+            d = max(abs(nx), abs(ny))               # 0 au centre, 1 sur tout le bord
             if d <= plein:
                 a = 255
             elif d >= BORD:

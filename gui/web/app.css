@@ -125,8 +125,8 @@ button,input,select{font:inherit;color:inherit}
    Les conteneurs suivent ce ratio : un conteneur carre laisserait deux bandes
    vides et decalerait le logo vers le haut de son emplacement. */
 .bh-xs{width:44px;height:31px}
-.bh-md{width:240px;height:170px}
-.bh-lg{width:268px;height:190px}
+.bh-md{width:208px;height:147px}
+.bh-lg{width:226px;height:160px}   /* tient dans .hero-vis (262px) : a 268 elle etait rognee */
 
 /* matière en orbite : deux traits chauds qui parcourent le disque */
 .bh .bh-orbit-f,.bh .bh-orbit-b{opacity:0;transition:opacity .5s var(--ease)}
@@ -873,14 +873,14 @@ button,input,select{font:inherit;color:inherit}
   .ib-act .btn{flex:1 1 auto}
   .scanhud{grid-template-columns:1fr;gap:20px}
   .scanhud-vis{width:186px;height:186px}
-  .scanhud-vis .bh-md{width:176px;height:176px}
+  .scanhud-vis .bh-md{width:168px;height:119px}
 }
 @media (max-width:560px){
   .stage{padding:calc(var(--top-h) + 18px) 12px 56px}
   .view-head h1{font-size:22px}
   .hero-title{font-size:25px}
   .hero-vis{width:216px;height:216px}
-  .hero-vis .bh-lg{width:196px;height:196px}
+  .hero-vis .bh-lg{width:186px;height:132px}
   .hero-vis-c b{font-size:38px}
   .brand-txt small{display:none}
   .brand-txt b{font-size:12.5px;letter-spacing:.1em}

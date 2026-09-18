@@ -64,6 +64,12 @@ var auroraCtx = auroraCv.getContext('2d');
 var MW_SCALE = 0.5;
 var mwCv = document.createElement('canvas');
 var mwCtx = mwCv.getContext('2d');
+/* La marque, chargée une seule fois. `drawHole` ne dessine rien tant qu'elle
+   n'est pas prête : mieux vaut un halo seul pendant deux images qu'un second
+   trou noir qui ne ressemble pas au premier. */
+var holeImg = new Image();
+holeImg.src = 'logo-trou-noir.webp';
+
 var stars = [], planets = [], rocks = [], shooters = [], auroras = [];
 var hole = { x: 0, y: 0, r: 0 };
 var t0 = performance.now();
@@ -87,10 +93,13 @@ function build() {
   auroraCv.height = Math.max(1, Math.round(H * AURORA_SCALE));
   buildMilkyWay();
 
-  // Le trou noir est décentré : il doit rester lisible sans se placer
-  // derrière la colonne de contenu principale.
-  hole.x = W * 0.76;
-  hole.y = H * 0.34;
+  // Le trou noir est décentré, et il l'est plus qu'avant. À 0,76 de la largeur
+  // il se plaçait DERRIÈRE le bandeau d'état du tableau de bord : les pastilles
+  // « Réputation cloud » et consorts s'y délavaient. L'assombrir ne suffisait
+  // pas — c'est sa POSITION qui était mauvaise. Un fond illustre, il ne dispute
+  // jamais la lisibilité au contenu.
+  hole.x = W * 0.89;
+  hole.y = H * 0.17;
   hole.r = Math.max(46, Math.min(W, H) * 0.085);
 
   // Densité proportionnelle à la surface, bornée pour rester peu coûteuse.
@@ -453,7 +462,8 @@ function drawShooters() {
 function drawHole(tt) {
   var x = hole.x, y = hole.y, r = hole.r;
 
-  // Halo chaud diffus
+  /* Halo chaud diffus, dessiné dans tous les cas : c'est lui qui assoit
+     l'objet dans le fond, et il reste utile même si la photographie manque. */
   var halo = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * 4.2);
   halo.addColorStop(0, 'rgba(255,150,60,.20)');
   halo.addColorStop(0.45, 'rgba(230,100,25,.075)');
@@ -463,81 +473,28 @@ function drawHole(tt) {
   ctx.arc(x, y, r * 4.2, 0, Math.PI * 2);
   ctx.fill();
 
-  // Arc de lentille gravitationnelle : la face arrière du disque, courbée
-  // au-dessus de l'horizon — la signature visuelle d'un trou noir.
+  /* LA MÊME PHOTOGRAPHIE QUE LA MARQUE, et pas un dessin qui lui ressemble.
+     Ce trou noir de fond était auparavant tracé à la main d'après les
+     proportions de l'ANCIEN logo vectoriel — celui qui a été abandonné. Il
+     restait donc dans la page un second trou noir qui ne ressemblait pas au
+     premier, et deux objets qui prétendent être la même marque sans se
+     ressembler, c'est une marque cassée.
+     Une seule source désormais : `gui/web/logo-trou-noir.webp`. Si elle n'est
+     pas encore chargée, on ne dessine que le halo — jamais une approximation
+     qui divergerait à nouveau. */
+  if (!holeImg.complete || !holeImg.naturalWidth) return;
+
+  /* Respiration très lente : la matière tombe, elle ne clignote pas. */
+  var pulse = 1 + Math.sin(tt * 0.42) * 0.018;
+  var w = r * 6.2 * pulse;
+  var h = w * (holeImg.naturalHeight / holeImg.naturalWidth);
+
   ctx.save();
-  ctx.translate(x, y);
-  var arc = ctx.createLinearGradient(-r * 2.3, 0, r * 2.3, 0);
-  arc.addColorStop(0, 'rgba(184,56,10,.42)');
-  arc.addColorStop(0.5, 'rgba(255,230,180,.92)');
-  arc.addColorStop(1, 'rgba(184,56,10,.42)');
-  ctx.strokeStyle = arc;
-  ctx.lineWidth = Math.max(1.8, r * 0.085);   // plus fin que le disque, comme au logo
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  // Proportions reprises du logo (viewBox 64) : disque rx=27, horizon r=12,
-  // arc ry=17. Rapportées à r, cela donne rx=2.25r et ry=1.42r. L'arc doit
-  // culminer AU-DESSUS de l'horizon : plus bas, l'ensemble se lit comme une
-  // boule dans un cerceau au lieu d'une lentille gravitationnelle.
-  ctx.ellipse(0, r * 0.10, r * 2.28, r * 1.42, 0, Math.PI, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
-
-  // Disque d'accrétion : plusieurs ellipses fines, décalées en phase, dont
-  // l'opacité pulse — c'est ce qui donne la rotation de la matière.
-  ctx.save();
-  ctx.translate(x, y + r * 0.10);
-  for (var i = 0; i < 7; i++) {
-    var ph = tt * 0.55 + i * 0.9;
-    var puls = 0.55 + 0.45 * Math.sin(ph);
-    var rx = r * (2.30 - i * 0.055);
-    var ry = r * (0.46 - i * 0.012);
-    var g = ctx.createLinearGradient(-rx, 0, rx, 0);
-    g.addColorStop(0, 'rgba(184,56,10,' + (0.30 * puls) + ')');
-    g.addColorStop(0.20, 'rgba(242,129,27,' + (0.72 * puls) + ')');
-    g.addColorStop(0.50, 'rgba(255,246,221,' + (0.95 * puls) + ')');
-    g.addColorStop(0.80, 'rgba(245,135,28,' + (0.72 * puls) + ')');
-    g.addColorStop(1, 'rgba(184,56,10,' + (0.30 * puls) + ')');
-    ctx.strokeStyle = g;
-    ctx.lineWidth = Math.max(1.1, r * 0.055);
-    ctx.beginPath();
-    ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  // Horizon des événements : noir opaque, il masque le disque qui passe derrière.
-  ctx.fillStyle = '#000';
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Liseré incandescent au bord de l'horizon
-  ctx.strokeStyle = 'rgba(255,220,166,' + (0.34 + 0.14 * Math.sin(tt * 1.1)) + ')';
-  ctx.lineWidth = 1.1;
-  ctx.beginPath();
-  ctx.arc(x, y, r * 1.035, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Moitié avant du disque : redessinée PAR-DESSUS l'horizon, sinon le trou
-  // noir paraîtrait posé devant son propre disque.
-  ctx.save();
-  ctx.translate(x, y + r * 0.10);
-  for (var j = 0; j < 5; j++) {
-    var ph2 = tt * 0.55 + j * 0.9;
-    var puls2 = 0.55 + 0.45 * Math.sin(ph2);
-    var rx2 = r * (2.30 - j * 0.055);
-    var ry2 = r * (0.46 - j * 0.012);
-    var g2 = ctx.createLinearGradient(-rx2, 0, rx2, 0);
-    g2.addColorStop(0, 'rgba(184,56,10,' + (0.34 * puls2) + ')');
-    g2.addColorStop(0.5, 'rgba(255,246,221,' + (0.95 * puls2) + ')');
-    g2.addColorStop(1, 'rgba(184,56,10,' + (0.34 * puls2) + ')');
-    ctx.strokeStyle = g2;
-    ctx.lineWidth = Math.max(1.1, r * 0.055);
-    ctx.beginPath();
-    ctx.ellipse(0, 0, rx2, ry2, 0, 0, Math.PI);
-    ctx.stroke();
-  }
+  /* Discret : cette marque de fond passe DERRIERE du texte. A 0,85 elle
+     delavait les pastilles d'etat du bandeau hero — mesure, pas juge a l'oeil.
+     Le fond illustre, il ne doit jamais disputer la lisibilite au contenu. */
+  ctx.globalAlpha = 0.40;
+  ctx.drawImage(holeImg, x - w / 2, y - h / 2, w, h);
   ctx.restore();
 }
 

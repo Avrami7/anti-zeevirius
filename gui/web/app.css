@@ -1119,3 +1119,65 @@ button,input,select{font:inherit;color:inherit}
   .as-jrow{flex-wrap:wrap;gap:7px}
   .as-jrow p{flex:1 1 100%}
 }
+
+/* ══ LE TROU NOIR VIVANT ═══════════════════════════════════════════════════
+   La marque est devenue une PHOTOGRAPHIE : les tracés SVG `.bh-orbit-f`,
+   `.bh-orbit-b` et `.bh-photon` n'existent plus, et les règles qui les
+   animaient plus haut dans ce fichier sont désormais sans cible. Elles sont
+   conservées — elles ne coûtent rien et redeviendraient utiles si la marque
+   repassait au vectoriel — mais ce sont les règles ci-dessous qui font vivre
+   la photographie.
+
+   Trois états, et ils DISENT quelque chose plutôt que de décorer :
+     is-idle   la machine attend
+     is-active elle lit la phrase — l'aspiration s'accélère
+     is-exec   elle agit — le halo se durcit
+   Un interlocuteur qui ne montre rien de son état oblige à deviner s'il a
+   entendu. */
+
+.bh{isolation:isolate}
+
+/* L'ASPIRATION : un anneau qui naît large et s'effondre vers le centre, puis
+   disparaît. C'est de la matière happée — elle entre, elle ne ressort jamais.
+   Posé DERRIÈRE la photographie (z-index négatif) pour ne pas la voiler. */
+.bh::after{
+  content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  border-radius:50%;opacity:0;
+  box-shadow:0 0 0 1px rgba(255,190,110,.55), 0 0 18px 2px rgba(255,140,40,.35);
+}
+.bh.is-idle::after{animation:bhAspire 6.5s cubic-bezier(.35,0,.7,1) infinite}
+.bh.is-active::after{animation:bhAspire 2.1s cubic-bezier(.35,0,.7,1) infinite}
+.bh.is-exec::after{animation:bhAspire 1.25s cubic-bezier(.4,0,.8,1) infinite}
+
+@keyframes bhAspire{
+  0%   {transform:scale(1.55);opacity:0}
+  18%  {opacity:.55}
+  100% {transform:scale(.12);opacity:0}
+}
+
+/* La photographie elle-même respire : très peu au repos, nettement plus quand
+   la machine travaille. Au-delà, l'image se met à « pomper » et devient
+   pénible à regarder sur la durée d'une session. */
+.bh-photo{transform-origin:50% 50%}
+.bh.is-idle   .bh-photo{animation:bhSouffle 9s ease-in-out infinite}
+.bh.is-active .bh-photo{animation:bhSouffle 3.2s ease-in-out infinite}
+.bh.is-exec   .bh-photo{animation:bhSouffle 1.9s ease-in-out infinite}
+@keyframes bhSouffle{
+  0%,100%{transform:scale(1);filter:brightness(1)}
+  50%    {transform:scale(1.022);filter:brightness(1.13)}
+}
+.bh.is-exec .bh-halo{animation:haloPulse 1.4s ease-in-out infinite}
+
+/* ── Le visage de la console ─────────────────────────────────────────── */
+.as-face{display:flex;flex-direction:column;align-items:center;gap:2px;
+  margin:-4px 0 14px}
+.bh-conv{width:168px;height:119px}   /* ratio 240:170 de la photographie */
+.as-face-s{margin:0;font:500 11px/1.4 var(--f-ui, system-ui);letter-spacing:.14em;
+  text-transform:uppercase;color:var(--t-dim,#8b7565);transition:color .35s var(--ease,ease)}
+.as-face[data-etat="active"] .as-face-s{color:var(--or,#f5a44a)}
+.as-face[data-etat="exec"]   .as-face-s{color:var(--chaud,#ffd9a0)}
+
+@media (prefers-reduced-motion: reduce){
+  .bh::after,.bh-photo,.bh.is-exec .bh-halo{animation:none !important}
+  .bh-photo{transform:none !important;filter:none !important}
+}

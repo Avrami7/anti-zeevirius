@@ -344,6 +344,18 @@
         </header>
         <div class="p-body">
 
+          <!-- Le trou noir, present PENDANT le dialogue. Il n'est pas
+               decoratif : son etat dit ce que la machine est en train de faire
+               — a l'ecoute, en train de lire la phrase, ou en train d'agir.
+               Un interlocuteur qui ne montre rien de son etat oblige a deviner
+               s'il a entendu. -->
+          <div class="as-face">
+            <span class="bh bh-conv is-idle" id="asBh" aria-hidden="true">
+              <svg viewBox="0 0 240 170"><use href="#blackhole"/></svg>
+            </span>
+            <p class="as-face-s" id="asFaceEtat">À l'écoute</p>
+          </div>
+
           <div class="as-step" id="asStep1">
             <span class="as-step-n">01</span>
             <div class="as-step-b">

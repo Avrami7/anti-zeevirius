@@ -101,6 +101,27 @@ function bhState(el, state) {
   if (!el) return;
   el.classList.toggle('is-active', state === 'active');
   el.classList.toggle('is-idle', state === 'idle');
+  el.classList.toggle('is-exec', state === 'exec');
+}
+
+/* Le trou noir de la console, et la légende qui le double.
+   L'animation seule ne suffit pas : une pulsation plus rapide se remarque, mais
+   ne se COMPREND pas. Le mot dit ce que l'image ne peut pas dire, et il reste
+   lisible pour qui a désactivé les animations. */
+var AS_ETATS = {
+  idle:   'À l\'écoute',
+  active: 'Je lis votre phrase…',
+  exec:   'J\'exécute'
+};
+
+function asVisage(state) {
+  var bh = $('asBh');
+  if (!bh) return;
+  bhState(bh, state);
+  var face = bh.parentElement;
+  if (face) face.dataset.etat = state;
+  var mot = $('asFaceEtat');
+  if (mot) mot.textContent = AS_ETATS[state] || AS_ETATS.idle;
 }
 
 function jobStarted() {
@@ -2810,9 +2831,11 @@ function asComprendre() {
   $('asCmdResult').hidden = true;
   var b = $('btnAsComprendre');
   b.disabled = true;
+  asVisage('active');
 
   call('assistant.comprendre', { phrase: phrase }).then(function (res) {
     b.disabled = false;
+    asVisage('idle');
     if (!res.ok) {
       /* Module de compréhension absent : l'échec est annoncé pour ce qu'il
          est, et l'étape 02 reste verrouillée — jamais une exécution « au
@@ -2854,17 +2877,20 @@ function asResumeGenerique(obj) {
    (`exige_confirmation`), jamais sur une règle recopiée ici. */
 function asExecuterCapacite(detail, params, resultId, apres) {
   if (!detail) return;
+  asVisage('exec');
   var action = detail.action_bridge || '';
   if (!action) {
     showResult(resultId, 'warn', 'Capacité interne',
       '<p>« ' + esc(detail.titre) + ' » n\'a pas d\'action web : elle n\'est utilisée qu\'à ' +
       'l\'intérieur de l\'assistant et ne peut pas être lancée depuis l\'interface.</p>');
+    asVisage('idle');
     return;
   }
 
   if (detail.exige_confirmation) {
     /* Exactement le mécanisme des autres actions destructives de
        l'interface — il n'est pas réécrit ici, il est appelé. */
+    asVisage('idle');
     return destructive({
       action: action,
       body: params,
@@ -2896,6 +2922,10 @@ function asExecuterCapacite(detail, params, resultId, apres) {
     });
   }
 
+  /* Le visage revient au repos : pendant la lecture du plan destructif, c'est
+     l'utilisateur qui a la main, pas la machine. Le laisser sur « j'exécute »
+     serait un mensonge — rien n'est en train d'être exécuté. */
+
   /* Lecture (ou réversible que le pont ne fait pas confirmer) : exécution
      directe. `runJob` couvre les deux formes de réponse du contrat — un
      résultat immédiat, ou un `job_id` à sonder. */
@@ -2913,10 +2943,12 @@ function asExecuterCapacite(detail, params, resultId, apres) {
         'spécialisé de la section correspondante.</p>' + asResumeGenerique(res));
       toast(detail.titre, 'Capacité exécutée.', 'ok');
       loadStatus(true);
+      asVisage('idle');
       if (apres) apres();
     },
     onFail: function (res) {
       showJobline('asCmdJob', false);
+      asVisage('idle');
       handleFail(res, resultId, detail.titre);
     }
   });

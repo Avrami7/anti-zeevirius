@@ -27,8 +27,17 @@
   /* --- texte --- */
   --tx-1:#fdf3e7;
   --tx-2:#c3ab9b;
-  --tx-3:#8b7768;
-  --tx-4:#5d4f47;
+  /* Remontés au seuil de lisibilité WCAG AA (4,5:1 pour du texte courant),
+     mesuré contre le PIRE fond observé (0,020 ; relevé de 0,0116 à 0,0133 selon la
+     vue, marge prise pour qu'aucune vue ne repasse sous le seuil). Avant :
+     4,01:1 et 2,17:1 — le second était nettement sous le seuil, et le fond plus
+     lumineux du glassmorphisme aggravait le défaut au lieu de le créer.
+     La CHROMATICITÉ est inchangée : seule la luminosité monte, donc la charte
+     ne bouge pas d'un pouce. Ce sont ces deux teintes qui portent les mentions
+     « Opérationnel », les horodatages et les notes de bas de panneau — c'est-à-dire
+     exactement ce qu'un utilisateur vient vérifier d'un coup d'œil. */
+  --tx-3:#9f8976;   /* 4,51:1 */
+  --tx-4:#a1897b;   /* 4,56:1 */
 
   /* --- marque : incandescence --- */
   --hot:#fff3d6;      /* blanc-chaud, cœur du disque */
@@ -1172,12 +1181,96 @@ button,input,select{font:inherit;color:inherit}
 .as-face{display:flex;flex-direction:column;align-items:center;gap:2px;
   margin:-4px 0 14px}
 .bh-conv{width:168px;height:119px}   /* ratio 240:170 de la photographie */
-.as-face-s{margin:0;font:500 11px/1.4 var(--f-ui, system-ui);letter-spacing:.14em;
-  text-transform:uppercase;color:var(--t-dim,#8b7565);transition:color .35s var(--ease,ease)}
-.as-face[data-etat="active"] .as-face-s{color:var(--or,#f5a44a)}
-.as-face[data-etat="exec"]   .as-face-s{color:var(--chaud,#ffd9a0)}
+.as-face-s{margin:0;font:500 11px/1.4 var(--sans);letter-spacing:.14em;
+  text-transform:uppercase;color:var(--tx-3);transition:color .35s var(--ease)}
+.as-face[data-etat="active"] .as-face-s{color:var(--brand)}
+.as-face[data-etat="exec"]   .as-face-s{color:var(--brand-2)}
 
 @media (prefers-reduced-motion: reduce){
   .bh::after,.bh-photo,.bh.is-exec .bh-halo{animation:none !important}
   .bh-photo{transform:none !important;filter:none !important}
+}
+
+/* ══ GLASSMORPHISME ════════════════════════════════════════════════════════
+   Le `backdrop-filter` était déjà en place plus haut, et il fonctionnait — mais
+   il ne se VOYAIT pas, pour une raison qui n'est pas dans le verre : le fond
+   derrière les panneaux est presque noir, et la Voie lactée passe volontairement
+   SOUS la colonne de contenu pour ne pas rendre le texte illisible. Un flou qui
+   n'a rien à flouter ne produit rien.
+
+   Ce qui fait lire une vitre n'est donc pas le flou : c'est son ARÊTE. Une vraie
+   plaque de verre attrape la lumière sur son bord supérieur, la laisse filer le
+   long d'un côté, et projette une ombre portée sous elle. C'est ce triptyque
+   qu'on installe ici — sans ajouter une seule couche de `backdrop-filter`, qui
+   est l'effet le plus coûteux de la page et dont on a déjà mesuré le prix sur
+   l'aurore. */
+
+:root{
+  --verre-arete:rgba(255,236,214,.26);   /* l'arête éclairée, en haut */
+  --verre-flanc:rgba(255,236,214,.10);   /* la lumière qui file sur le côté */
+  --verre-fond:rgba(0,0,0,.55);          /* l'ombre portée sous la plaque */
+}
+
+.panel{
+  /* Le dégradé passe de « verre éclairé » en haut-gauche à « verre dans
+     l'ombre » en bas-droite : c'est l'inclinaison de la plaque sous la lumière,
+     et c'est elle qui donne l'épaisseur. */
+  background:
+    linear-gradient(152deg,
+      rgba(255,236,214,.105) 0%,
+      rgba(255,236,214,.055) 34%,
+      rgba(255,236,214,.022) 68%,
+      rgba(120,60,20,.030) 100%);
+  border-color:rgba(255,222,186,.16);
+  box-shadow:
+    0 26px 52px -30px var(--verre-fond),         /* la plaque flotte */
+    0 2px 10px -6px rgba(0,0,0,.6),
+    inset 0 1px 0 var(--verre-arete),            /* l'arête du haut */
+    inset 1px 0 0 var(--verre-flanc),            /* le flanc gauche */
+    inset 0 -1px 0 rgba(0,0,0,.34);              /* le bord bas, dans l'ombre */
+}
+
+/* Le reflet spéculaire : une bande claire très fine qui court sur le haut de la
+   plaque et s'éteint avant les angles. Sans elle, le panneau reste un
+   rectangle teinté ; avec elle, l'œil voit une surface. */
+.panel::before{
+  content:"";position:absolute;left:8%;right:8%;top:0;height:1px;
+  pointer-events:none;z-index:2;
+  background:linear-gradient(90deg,transparent,rgba(255,244,225,.55) 28%,
+             rgba(255,244,225,.55) 72%,transparent);
+}
+
+/* Au survol, la plaque se soulève et son arête s'allume. Le mouvement est
+   minime — 2 pixels : au-delà, une grille de cartes se met à tressauter au
+   passage de la souris, ce qui fatigue vite. */
+.panel{transition:box-shadow .38s var(--ease), transform .38s var(--ease)}
+@media (hover:hover){
+  .panel:hover{
+    transform:translateY(-2px);
+    box-shadow:
+      0 34px 62px -30px var(--verre-fond),
+      0 2px 12px -6px rgba(0,0,0,.6),
+      inset 0 1px 0 rgba(255,244,225,.38),
+      inset 1px 0 0 rgba(255,236,214,.16),
+      inset 0 -1px 0 rgba(0,0,0,.34);
+  }
+}
+
+/* ── Donner au verre quelque chose à filtrer ──────────────────────────────
+   Les nappes floutées du fond existaient déjà mais restaient trop discrètes
+   pour traverser une plaque. On les remonte — modérément : c'est le contraste
+   du TEXTE qui fixe la limite, jamais le goût. Au-delà, on obtient un bel
+   effet et un tableau de bord qu'on ne peut plus lire. */
+.halo-a{background:radial-gradient(circle,rgba(226,86,15,.40),transparent 68%)}
+.halo-b{background:radial-gradient(circle,rgba(255,154,46,.26),transparent 66%)}
+.halo-c{background:radial-gradient(circle,rgba(150,52,14,.38),transparent 70%)}
+.starfield{opacity:.72}
+
+/* Les panneaux indisponibles restent en retrait : une plaque éteinte ne doit
+   pas attraper la lumière comme une plaque active. */
+.panel[data-dispo="non"]::before{opacity:.25}
+
+@media (prefers-reduced-motion: reduce){
+  .panel{transition:none}
+  .panel:hover{transform:none}
 }

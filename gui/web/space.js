@@ -98,9 +98,15 @@ function build() {
   // « Réputation cloud » et consorts s'y délavaient. L'assombrir ne suffisait
   // pas — c'est sa POSITION qui était mauvaise. Un fond illustre, il ne dispute
   // jamais la lisibilité au contenu.
-  hole.x = W * 0.89;
-  hole.y = H * 0.17;
-  hole.r = Math.max(46, Math.min(W, H) * 0.085);
+  /* Placement : dans la BANDE OUVERTE, a droite du titre de page — le seul
+     endroit du tableau de bord ou aucun panneau ne le recouvre.
+     Mesure a l'appui : place a 0,30 de la hauteur, l'anneau tombait derriere le
+     panneau hero, dont le `backdrop-filter: blur(18px)` le reduisait a une
+     tache sombre. Un fond anime cache derriere une vitre depolie n'est plus un
+     fond anime. */
+  hole.x = W * 0.80;
+  hole.y = H * 0.155;
+  hole.r = Math.max(34, Math.min(W, H) * 0.062);   // l'anneau vaut 1,34 r : a 0,085 il mangeait le panneau
 
   // Densité proportionnelle à la surface, bornée pour rester peu coûteuse.
   var area = W * H;
@@ -462,39 +468,106 @@ function drawShooters() {
 function drawHole(tt) {
   var x = hole.x, y = hole.y, r = hole.r;
 
-  /* Halo chaud diffus, dessiné dans tous les cas : c'est lui qui assoit
-     l'objet dans le fond, et il reste utile même si la photographie manque. */
-  var halo = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * 4.2);
-  halo.addColorStop(0, 'rgba(255,150,60,.20)');
-  halo.addColorStop(0.45, 'rgba(230,100,25,.075)');
+  /* ── L'ANNEAU, vu PAR LA TRANCHE ─────────────────────────────────────────
+     Le propriétaire a tranché : la photographie reste la MARQUE — en-tête,
+     jauge, icône, favicon — et le fond porte cet anneau animé. Les deux ne
+     montrent pas le même angle de vue, et c'est voulu : un anneau FERMÉ exige
+     la vue par la tranche, une vue de trois quarts ne peut pas le produire.
+
+     Ce qui ferme le cercle est la lentille gravitationnelle : elle relève le
+     disque par-dessus le sommet ET le rabat sous la base, et les deux arcs se
+     rejoignent. C'est la signature de ce point de vue, et c'est exactement ce
+     que la référence montre.
+
+     Le mouvement demandé est la CIRCULATION de la lumière le long de
+     l'anneau : des zones plus vives qui tournent, et non un clignotement
+     d'ensemble. Une pulsation uniforme se lit comme une ampoule ; c'est le
+     différentiel qui se lit comme de la matière en orbite.
+
+     Ordre de tracé, qui est l'optique du sujet et non une commodité :
+       voile → arrière du disque → moitié arrière de l'anneau → SPHÈRE NOIRE
+       → moitié avant de l'anneau → avant du disque qui passe devant. */
+
+  var halo = ctx.createRadialGradient(x, y, r * 0.55, x, y, r * 4.6);
+  halo.addColorStop(0, 'rgba(255,170,80,.17)');
+  halo.addColorStop(0.42, 'rgba(230,110,30,.065)');
   halo.addColorStop(1, 'rgba(180,60,10,0)');
   ctx.fillStyle = halo;
-  ctx.beginPath();
-  ctx.arc(x, y, r * 4.2, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y, r * 4.6, 0, Math.PI * 2); ctx.fill();
 
-  /* LA MÊME PHOTOGRAPHIE QUE LA MARQUE, et pas un dessin qui lui ressemble.
-     Ce trou noir de fond était auparavant tracé à la main d'après les
-     proportions de l'ANCIEN logo vectoriel — celui qui a été abandonné. Il
-     restait donc dans la page un second trou noir qui ne ressemblait pas au
-     premier, et deux objets qui prétendent être la même marque sans se
-     ressembler, c'est une marque cassée.
-     Une seule source désormais : `gui/web/logo-trou-noir.webp`. Si elle n'est
-     pas encore chargée, on ne dessine que le halo — jamais une approximation
-     qui divergerait à nouveau. */
-  if (!holeImg.complete || !holeImg.naturalWidth) return;
-
-  /* Respiration très lente : la matière tombe, elle ne clignote pas. */
-  var pulse = 1 + Math.sin(tt * 0.42) * 0.018;
-  var w = r * 6.2 * pulse;
-  var h = w * (holeImg.naturalHeight / holeImg.naturalWidth);
+  var A = 0.40;                    // discrétion : ce fond passe derrière du texte
+  var rr = r * 1.34;               // rayon de l'anneau de photons
+  var vitesse = tt * 1.45;         // rotation de la matière
 
   ctx.save();
-  /* Discret : cette marque de fond passe DERRIERE du texte. A 0,85 elle
-     delavait les pastilles d'etat du bandeau hero — mesure, pas juge a l'oeil.
-     Le fond illustre, il ne doit jamais disputer la lisibilite au contenu. */
-  ctx.globalAlpha = 0.40;
-  ctx.drawImage(holeImg, x - w / 2, y - h / 2, w, h);
+  ctx.translate(x, y);
+  ctx.globalAlpha = A;
+
+  /* La barre du disque, vue par la tranche : elle file très loin de part et
+     d'autre et s'éteint en pointe. C'est elle qui donne l'échelle. */
+  function barre(largeur, opac) {
+    var g = ctx.createLinearGradient(-r * 4.2, 0, r * 4.2, 0);
+    g.addColorStop(0.00, 'rgba(210,90,20,0)');
+    g.addColorStop(0.18, 'rgba(255,170,80,' + (opac * 0.55).toFixed(3) + ')');
+    g.addColorStop(0.42, 'rgba(255,240,205,' + opac.toFixed(3) + ')');
+    g.addColorStop(0.58, 'rgba(255,240,205,' + opac.toFixed(3) + ')');
+    g.addColorStop(0.82, 'rgba(255,170,80,' + (opac * 0.55).toFixed(3) + ')');
+    g.addColorStop(1.00, 'rgba(210,90,20,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(-r * 4.2, -largeur / 2, r * 8.4, largeur);
+  }
+  barre(r * 0.30, 0.30);           // le voile large
+  barre(r * 0.085, 0.85);          // le cœur mince
+
+  /* L'anneau, tracé en segments dont la vivacité suit une onde qui tourne.
+     60 segments : en dessous, on voit les raccords ; au-dessus, on paie sans
+     rien gagner. Deux ondes de vitesses différentes pour que le motif ne se
+     répète pas de façon mécanique. */
+  function anneau(demi) {           // demi = 'haut' (derrière) ou 'bas' (devant)
+    var n = 60, d0 = demi === 'haut' ? Math.PI : 0;
+    for (var i = 0; i < n; i++) {
+      var a0 = d0 + (i / n) * Math.PI, a1 = d0 + ((i + 1.15) / n) * Math.PI;
+      // Amplitude franche : avec une onde molle, l'anneau brille d'un bloc et
+      // la circulation ne se voit pas. Mesure a l'appui — l'ecart entre deux
+      // instants etait de 1,5 sur 255, soit rien.
+      var onde = 0.30
+               + 0.62 * Math.sin(a0 * 2 - vitesse)
+               + 0.22 * Math.sin(a0 * 5 + vitesse * 2.3);
+      // Le bas est plus vif que le haut : l'avant du disque vient vers nous.
+      var f = onde * (demi === 'bas' ? 1 : 0.68);
+      ctx.strokeStyle = 'rgba(255,' + Math.round(235 - 40 * (1 - f)) + ',' +
+                        Math.round(198 - 70 * (1 - f)) + ',' + Math.max(0, f).toFixed(3) + ')';
+      ctx.lineWidth = r * (0.055 + 0.085 * f);   // l'epaisseur suit la vivacite
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, rr, rr * 0.99, 0, a0, a1);
+      ctx.stroke();
+    }
+  }
+
+  anneau('haut');                   // l'arrière, relevé par la lentille
+
+  /* La sphère : noir pur, elle occulte tout ce qui passe derrière elle. */
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#000';
+  ctx.beginPath(); ctx.arc(0, 0, rr * 0.955, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = A;
+
+  anneau('bas');                    // l'avant, plus vif
+
+  /* L'avant du disque repasse DEVANT la sphère : c'est ce trait qui empêche
+     l'ensemble de se lire comme un simple cerceau posé autour d'une bille. */
+  var av = ctx.createLinearGradient(-rr, 0, rr, 0);
+  av.addColorStop(0.00, 'rgba(255,200,130,.35)');
+  av.addColorStop(0.50, 'rgba(255,250,235,.95)');
+  av.addColorStop(1.00, 'rgba(255,200,130,.35)');
+  ctx.strokeStyle = av;
+  ctx.lineWidth = r * 0.075;
+  ctx.beginPath();
+  ctx.moveTo(-rr * 0.99, r * 0.02);
+  ctx.lineTo(rr * 0.99, r * 0.02);
+  ctx.stroke();
+
   ctx.restore();
 }
 

@@ -104,8 +104,8 @@ function build() {
      panneau hero, dont le `backdrop-filter: blur(18px)` le reduisait a une
      tache sombre. Un fond anime cache derriere une vitre depolie n'est plus un
      fond anime. */
-  hole.x = W * 0.80;
-  hole.y = H * 0.155;
+  hole.x = W * 0.82;
+  hole.y = H * 0.150;
   hole.r = Math.max(34, Math.min(W, H) * 0.062);   // l'anneau vaut 1,34 r : a 0,085 il mangeait le panneau
 
   // Densité proportionnelle à la surface, bornée pour rester peu coûteuse.
@@ -468,106 +468,82 @@ function drawShooters() {
 function drawHole(tt) {
   var x = hole.x, y = hole.y, r = hole.r;
 
-  /* ── L'ANNEAU, vu PAR LA TRANCHE ─────────────────────────────────────────
-     Le propriétaire a tranché : la photographie reste la MARQUE — en-tête,
-     jauge, icône, favicon — et le fond porte cet anneau animé. Les deux ne
-     montrent pas le même angle de vue, et c'est voulu : un anneau FERMÉ exige
-     la vue par la tranche, une vue de trois quarts ne peut pas le produire.
+  /* ── LA PHOTOGRAPHIE, AVEC LE MOUVEMENT AUTOUR ───────────────────────────
+     Décision du propriétaire, après trois références : « je veux cela avec le
+     mouvement lumineux autour ». Donc SA photographie — la même que la marque,
+     une seule identité — et la circulation de la lumière ajoutée par-dessus.
 
-     Ce qui ferme le cercle est la lentille gravitationnelle : elle relève le
-     disque par-dessus le sommet ET le rabat sous la base, et les deux arcs se
-     rejoignent. C'est la signature de ce point de vue, et c'est exactement ce
-     que la référence montre.
+     L'anneau fermé dessiné à la main a été essayé et écarté : il imposait la
+     vue par la tranche, donc un second trou noir qui ne ressemblait pas au
+     premier. Le mouvement, lui, se surimpose à n'importe quel angle de vue.
 
-     Le mouvement demandé est la CIRCULATION de la lumière le long de
-     l'anneau : des zones plus vives qui tournent, et non un clignotement
-     d'ensemble. Une pulsation uniforme se lit comme une ampoule ; c'est le
-     différentiel qui se lit comme de la matière en orbite.
+     La lumière circule le long du PLAN DU DISQUE de la photographie — une
+     ellipse très aplatie, inclinée du même angle que sur l'image. Elle ne tourne
+     pas autour d'un axe quelconque : de la matière en orbite suit le disque,
+     sinon le mouvement se lit comme un halo qui tourne bêtement. */
 
-     Ordre de tracé, qui est l'optique du sujet et non une commodité :
-       voile → arrière du disque → moitié arrière de l'anneau → SPHÈRE NOIRE
-       → moitié avant de l'anneau → avant du disque qui passe devant. */
-
-  var halo = ctx.createRadialGradient(x, y, r * 0.55, x, y, r * 4.6);
-  halo.addColorStop(0, 'rgba(255,170,80,.17)');
-  halo.addColorStop(0.42, 'rgba(230,110,30,.065)');
+  var halo = ctx.createRadialGradient(x, y, r * 0.55, x, y, r * 4.4);
+  halo.addColorStop(0, 'rgba(255,165,75,.18)');
+  halo.addColorStop(0.42, 'rgba(230,110,30,.07)');
   halo.addColorStop(1, 'rgba(180,60,10,0)');
   ctx.fillStyle = halo;
-  ctx.beginPath(); ctx.arc(x, y, r * 4.6, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y, r * 4.4, 0, Math.PI * 2); ctx.fill();
 
-  var A = 0.40;                    // discrétion : ce fond passe derrière du texte
-  var rr = r * 1.34;               // rayon de l'anneau de photons
-  var vitesse = tt * 1.45;         // rotation de la matière
+  if (!holeImg.complete || !holeImg.naturalWidth) return;
+
+  var w = r * 6.2;
+  var h = w * (holeImg.naturalHeight / holeImg.naturalWidth);
+
+  ctx.save();
+  /* Discret : ce fond passe derrière du texte. Mesuré — à 0,85 il délavait les
+     pastilles d'état. Le fond illustre, il ne dispute jamais la lisibilité. */
+  ctx.globalAlpha = 0.40;
+  ctx.drawImage(holeImg, x - w / 2, y - h / 2, w, h);
+  ctx.restore();
+
+  /* ── La circulation ──────────────────────────────────────────────────────
+     Des arcs courts qui défilent le long du disque. `lineDashOffset` animé
+     plutôt qu'un recalcul de segments : le navigateur fait le travail, le coût
+     par image est celui d'un seul tracé.
+
+     Le côté GAUCHE est plus vif : c'est celui qui vient vers l'observateur sur
+     la photographie, et le décalage Doppler l'amplifie. Un défilement d'égale
+     intensité des deux côtés se lirait comme un anneau lumineux qui tourne,
+     pas comme de la matière qui tombe. */
+  var rx = w * 0.455, ry = w * 0.105;
+  var incl = -0.13;                  // l'inclinaison du disque sur l'image
+  var per = 2 * Math.PI * Math.max(rx, ry);
 
   ctx.save();
   ctx.translate(x, y);
-  ctx.globalAlpha = A;
+  ctx.rotate(incl);
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineCap = 'round';
 
-  /* La barre du disque, vue par la tranche : elle file très loin de part et
-     d'autre et s'éteint en pointe. C'est elle qui donne l'échelle. */
-  function barre(largeur, opac) {
-    var g = ctx.createLinearGradient(-r * 4.2, 0, r * 4.2, 0);
-    g.addColorStop(0.00, 'rgba(210,90,20,0)');
-    g.addColorStop(0.18, 'rgba(255,170,80,' + (opac * 0.55).toFixed(3) + ')');
-    g.addColorStop(0.42, 'rgba(255,240,205,' + opac.toFixed(3) + ')');
-    g.addColorStop(0.58, 'rgba(255,240,205,' + opac.toFixed(3) + ')');
-    g.addColorStop(0.82, 'rgba(255,170,80,' + (opac * 0.55).toFixed(3) + ')');
-    g.addColorStop(1.00, 'rgba(210,90,20,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(-r * 4.2, -largeur / 2, r * 8.4, largeur);
+  // Trois trains d'arcs de longueurs et de vitesses différentes : un seul
+  // train se répète de façon mécanique et l'oeil le repère en dix secondes.
+  var trains = [
+    { seg: per * 0.035, trou: per * 0.30, v: 0.26, ep: 0.055, a: 0.55 },
+    { seg: per * 0.018, trou: per * 0.19, v: 0.41, ep: 0.030, a: 0.42 },
+    { seg: per * 0.009, trou: per * 0.11, v: 0.62, ep: 0.018, a: 0.28 }
+  ];
+  for (var k = 0; k < trains.length; k++) {
+    var T = trains[k];
+    // Dégradé horizontal : blanc-chaud à gauche, ambre éteint à droite.
+    var g = ctx.createLinearGradient(-rx, 0, rx, 0);
+    g.addColorStop(0.00, 'rgba(255,252,246,' + T.a.toFixed(3) + ')');
+    g.addColorStop(0.34, 'rgba(255,232,190,' + (T.a * 0.72).toFixed(3) + ')');
+    g.addColorStop(0.68, 'rgba(255,170,80,'  + (T.a * 0.34).toFixed(3) + ')');
+    g.addColorStop(1.00, 'rgba(220,100,30,'  + (T.a * 0.14).toFixed(3) + ')');
+    ctx.strokeStyle = g;
+    ctx.lineWidth = Math.max(0.8, r * T.ep);
+    ctx.setLineDash([T.seg, T.trou]);
+    ctx.lineDashOffset = -tt * per * T.v;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+    ctx.stroke();
   }
-  barre(r * 0.30, 0.30);           // le voile large
-  barre(r * 0.085, 0.85);          // le cœur mince
-
-  /* L'anneau, tracé en segments dont la vivacité suit une onde qui tourne.
-     60 segments : en dessous, on voit les raccords ; au-dessus, on paie sans
-     rien gagner. Deux ondes de vitesses différentes pour que le motif ne se
-     répète pas de façon mécanique. */
-  function anneau(demi) {           // demi = 'haut' (derrière) ou 'bas' (devant)
-    var n = 60, d0 = demi === 'haut' ? Math.PI : 0;
-    for (var i = 0; i < n; i++) {
-      var a0 = d0 + (i / n) * Math.PI, a1 = d0 + ((i + 1.15) / n) * Math.PI;
-      // Amplitude franche : avec une onde molle, l'anneau brille d'un bloc et
-      // la circulation ne se voit pas. Mesure a l'appui — l'ecart entre deux
-      // instants etait de 1,5 sur 255, soit rien.
-      var onde = 0.30
-               + 0.62 * Math.sin(a0 * 2 - vitesse)
-               + 0.22 * Math.sin(a0 * 5 + vitesse * 2.3);
-      // Le bas est plus vif que le haut : l'avant du disque vient vers nous.
-      var f = onde * (demi === 'bas' ? 1 : 0.68);
-      ctx.strokeStyle = 'rgba(255,' + Math.round(235 - 40 * (1 - f)) + ',' +
-                        Math.round(198 - 70 * (1 - f)) + ',' + Math.max(0, f).toFixed(3) + ')';
-      ctx.lineWidth = r * (0.055 + 0.085 * f);   // l'epaisseur suit la vivacite
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.ellipse(0, 0, rr, rr * 0.99, 0, a0, a1);
-      ctx.stroke();
-    }
-  }
-
-  anneau('haut');                   // l'arrière, relevé par la lentille
-
-  /* La sphère : noir pur, elle occulte tout ce qui passe derrière elle. */
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = '#000';
-  ctx.beginPath(); ctx.arc(0, 0, rr * 0.955, 0, Math.PI * 2); ctx.fill();
-  ctx.globalAlpha = A;
-
-  anneau('bas');                    // l'avant, plus vif
-
-  /* L'avant du disque repasse DEVANT la sphère : c'est ce trait qui empêche
-     l'ensemble de se lire comme un simple cerceau posé autour d'une bille. */
-  var av = ctx.createLinearGradient(-rr, 0, rr, 0);
-  av.addColorStop(0.00, 'rgba(255,200,130,.35)');
-  av.addColorStop(0.50, 'rgba(255,250,235,.95)');
-  av.addColorStop(1.00, 'rgba(255,200,130,.35)');
-  ctx.strokeStyle = av;
-  ctx.lineWidth = r * 0.075;
-  ctx.beginPath();
-  ctx.moveTo(-rr * 0.99, r * 0.02);
-  ctx.lineTo(rr * 0.99, r * 0.02);
-  ctx.stroke();
-
+  ctx.setLineDash([]);
   ctx.restore();
 }
 
